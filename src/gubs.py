@@ -26,6 +26,7 @@ def dual_criterion(lamb, V_i, S, goal, succ_states, A, c=1, epsilon=1e-3, n_iter
         V_ = np.copy(V)
         P_ = np.copy(P)
         for s in not_goal:
+
             all_reachable = [succ_states[s, a] for a in A]
             actions_results_p = np.array([
                 np.sum([

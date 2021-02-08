@@ -11,6 +11,7 @@ from datetime import datetime
 from pddlgym.inference import check_goal
 import mdp
 import gubs
+from utils import text_render
 
 matplotlib.use('TkAgg')
 
@@ -136,7 +137,10 @@ def run_episode(pi,
             pi(obs) if not keep_cost else pi(obs, i - 1))
         cum_reward += reward
         if print_history:
-            print(pi(old_obs), reward)
+            state_text_render = text_render(env, old_obs)
+            if state_text_render:
+                print("State:", state_text_render)
+            print(" ",pi(old_obs), reward)
 
         if render_and_save:
             img = env.render()

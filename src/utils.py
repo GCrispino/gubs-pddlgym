@@ -38,14 +38,14 @@ def expblocks_text_render(obs):
             clear.append(lit.variables[0])
         elif lit.predicate.name == 'on':
             on.append(lit.variables[:2])
-        elif lit.predicate.name == 'on-table':
+        elif lit.predicate.name == 'ontable':
             ontable.append(lit.variables[0])
         elif lit.predicate.name == 'destroyed':
             destroyed_blocks.append(lit.variables[0])
         elif lit.predicate.name == 'holding':
             holding = lit.variables[0]
         elif lit.predicate.name == 'table-destroyed':
-            table_destroyed = lit.variables[0]
+            table_destroyed = True
     return f"""
         {"Table destroyed" if table_destroyed else ""}
         {f"Holding {holding}" if holding else "Hand empty"}

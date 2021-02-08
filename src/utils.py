@@ -2,12 +2,12 @@
 #    return [s for s in S if get_values(s.literals, 'robot-at')[0][1].split(':')[0][1:-1] == f'{x}-{y}'][0]
 #
 #    
-#def get_values(obs, name):
-#    values = []
-#    for lit in obs:
-#        if lit.predicate.name == name:
-#            values.append(lit.variables)
-#    return values
+def get_values(obs, name):
+    values = []
+    for lit in obs:
+        if lit.predicate.name == name:
+            values.append(lit.variables)
+    return values
 
 def tireworld_text_render(obs):
     vehicle_location = None

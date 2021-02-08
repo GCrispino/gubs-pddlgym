@@ -1,13 +1,7 @@
 import itertools
+from utils import get_values
 import numpy as np
 from pddlgym.inference import check_goal
-
-def get_values(obs, name):
-    values = []
-    for lit in obs:
-        if lit.predicate.name == name:
-            values.append(lit.variables)
-    return values
 
 def dual_criterion(lamb, V_i, S, goal, succ_states, A, c=1, epsilon=1e-3, n_iter=None):
     def u(c): return np.exp(lamb * c)

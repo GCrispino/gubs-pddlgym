@@ -1,44 +1,24 @@
 import os
 import unittest
 from copy import deepcopy
+import gubs
 import mdp
+import utils
 import numpy as np
 import pytest
 from itertools import chain
-from pddlgym.core import PDDLEnv
 from pddlgym.inference import check_goal
-from pddlgym.structs import Predicate, State, Type
+from pddlgym.structs import Predicate, Type
 
 
 def h_1(s):
     return 1
 
-def create_problem_instance_from_file(domain_path_name, problem_index=0):
-    dir_path = os.path.dirname(os.path.realpath(__file__))
-    domain_file = os.path.join(dir_path, 'pddl', f'{domain_path_name}.pddl')
-    problem_dir = os.path.join(dir_path, 'pddl', f'{domain_path_name}')
-
-    env = PDDLEnv(domain_file,
-                  problem_dir,
-                  raise_error_on_invalid_action=True,
-                  dynamic_action_space=False)
-
-    env.fix_problem_index(problem_index)
-    return env, env.problems[problem_index]
-
-def create_states_from_base_literals(base_state_literals, state_literals,
-                                     problem):
-    return [
-        State(frozenset({*base_state_literals, *literals}),
-              frozenset(problem.objects), problem.goal)
-        for literals in state_literals
-    ]
-
-
 # Define test data for test_domain
 # =================================
 
-env_test_domain, problem = create_problem_instance_from_file('test_domain')
+dir_path = os.path.dirname(os.path.realpath(__file__))
+env_test_domain, problem = utils.create_problem_instance_from_file(dir_path, 'test_domain')
 goal_test_domain = problem.goal
 
 location_type = Type('location')
@@ -56,7 +36,7 @@ base_state_literals = frozenset({
     is_goal_predicate('s3')
 })
 
-s1, s2, s3, de = create_states_from_base_literals(
+s1, s2, s3, de = utils.create_states_from_base_literals(
     base_state_literals, [
         frozenset({robot_at_predicate('s1')}),
         frozenset({robot_at_predicate('s2')}),
@@ -68,9 +48,10 @@ s1, s2, s3, de = create_states_from_base_literals(
 # Define test data for test_domain_gridworld
 # =================================
 
-env_test_domain_gridworld, problem = create_problem_instance_from_file(
-    'test_domain_gridworld')
+env_test_domain_gridworld, problem = utils.create_problem_instance_from_file(
+    dir_path, 'test_domain_gridworld')
 goal_test_domain_gridworld = problem.goal
+problem_gridworld = problem
 
 location_type = Type('location')
 direction_type = Type('direction')
@@ -86,15 +67,15 @@ base_state_literals_gridworld = frozenset({
     conn_prob_predicate('s3', 's2', 'left')
 })
 
-s1_gridworld, s2_gridworld, s3_gridworld = create_states_from_base_literals(
+s1_gridworld, s2_gridworld, s3_gridworld = utils.create_states_from_base_literals(
     base_state_literals_gridworld, [
         frozenset({robot_at_predicate('s1')}),
         frozenset({robot_at_predicate('s2')}),
         frozenset({robot_at_predicate('s3')})
     ], problem)
 
-env_test_domain_gridworld_2, problem = create_problem_instance_from_file(
-    'test_domain_gridworld', problem_index=1)
+env_test_domain_gridworld_2, problem = utils.create_problem_instance_from_file(
+    dir_path, 'test_domain_gridworld', problem_index=1)
 goal_test_domain_gridworld_2 = problem.goal
 
 conn_predicates_gridworld_2 = frozenset((lit for lit in problem.initial_state if lit.predicate.name.startswith('conn')))
@@ -104,11 +85,55 @@ conn_predicates_gridworld_2 = frozenset((lit for lit in problem.initial_state if
     s5_gridworld_2, s6_gridworld_2,
     s7_gridworld_2, s8_gridworld_2,
     s9_gridworld_2, s10_gridworld_2,
-) = create_states_from_base_literals(
+) = utils.create_states_from_base_literals(
     conn_predicates_gridworld_2, [
         frozenset({robot_at_predicate(f's{i}')}) for i in range(1, 11)
     ], problem)
 
+# =================================
+
+# Define test data for river problem
+# =================================
+env_river, problem = utils.create_problem_instance_from_file(
+    dir_path, 'river-alt', problem_index=2)
+goal_river = problem.goal
+
+conn_predicates_river = utils.get_literals_that_start_with(problem.initial_state, 'conn')
+isriver_predicates_river = utils.get_literals_that_start_with(problem.initial_state, 'is-river')
+iswaterfall_predicates_river = utils.get_literals_that_start_with(problem.initial_state, 'is-waterfall')
+isbank_predicates_river = utils.get_literals_that_start_with(problem.initial_state, 'is-bank')
+isbridge_predicates_river = utils.get_literals_that_start_with(problem.initial_state, 'is-bridge')
+isgoal_predicates_river = utils.get_literals_that_start_with(problem.initial_state, 'is-goal')
+
+
+river_location_objs = utils.get_objects_by_name(problem.objects, 'location')
+river_location_objs = sorted(
+    utils.get_objects_by_name(
+        problem.objects, 'location'),
+        key=lambda s: tuple(reversed(utils.get_coord_from_location_obj(s))))
+base_literals = frozenset({
+    *conn_predicates_river, *isriver_predicates_river,
+    *iswaterfall_predicates_river, *isbank_predicates_river,
+    *isbridge_predicates_river, *isgoal_predicates_river
+})
+
+robot_at_predicate = Predicate('robot-at', 2, [location_type])
+river_states = utils.create_states_from_base_literals(
+    base_literals, [
+        frozenset({robot_at_predicate('robot0', obj.name)}) for obj in river_location_objs
+    ], problem)
+init_river, _ = env_river.reset()
+A_river = np.array(
+            list(env_river.action_space.all_ground_literals(init_river)))
+
+
+reach_river = mdp.get_all_reachable(init_river, A_river, env_river)
+S_river = list(sorted([s for s in reach_river], key = lambda s: tuple(reversed(utils.get_coord_from_state(s)))))
+V_i_river = {s: i for i, s in enumerate(S_river)}
+succ_states_river = {s: {} for s in reach_river}
+for s in reach_river:
+    for a in A_river:
+        succ_states_river[s, a] = reach_river[s][a]
 # =================================
 
 # gubs
@@ -172,16 +197,11 @@ bpsg = {
 
 explicit_graph_test_dual_criterion = {
     s1: {
-        "value":
-        1,
-        "prob":
-        0,
-        "solved":
-        False,
-        "expanded":
-        True,
-        "pi":
-        "None",
+        "value": 1,
+        "prob": 0,
+        "solved": False,
+        "expanded": True,
+        "pi": "None",
         "Adj": [
             {
                 "state": s2,
@@ -233,6 +253,45 @@ bpsg_test_dual_criterion = {
     s1: {
         "Adj": [],
     }
+}
+
+bpsg_2 = {
+    s1_gridworld: {
+        "Adj": [
+            {
+                "state": s1_gridworld,
+                "A": {
+                    move_operator_pred('right'): 0.5,
+                }
+            },
+            {
+                "state": s2_gridworld,
+                "A": {move_operator_pred('right'): 0.5}
+            }
+        ]
+    },
+    s2_gridworld: {
+        "Adj": [
+            {
+                "state": s2_gridworld,
+                "A": {
+                    move_operator_pred('right'): 0.5,
+                }
+            },
+            {
+                "state": s3_gridworld,
+                "A": {move_operator_pred('right'): 0.5}
+            }
+        ]
+    },
+    s3_gridworld: {
+        "Adj": [{
+            "state": s3_gridworld,
+            "A": {
+                move_operator_pred('up'): 1,
+            }
+        }]
+    },
 }
 
 explicit_graph_test_dual_criterion_2 = {
@@ -368,6 +427,205 @@ explicit_graph_test_dual_criterion_3 = {
     }
 }
 
+bpsg_extended = {
+    (s1_gridworld, 0): {"Adj": []},
+}
+
+bpsg_2_extended = {
+    (s1_gridworld, 0): {
+        "Adj": [
+            {
+                "state": (s1_gridworld, 1),
+                "A": {
+                    move_operator_pred('right'): 0.5,
+                }
+            },
+            {
+                "state": (s2_gridworld, 1),
+                "A": {move_operator_pred('right'): 0.5}
+            }
+        ]
+    },
+    (s2_gridworld, 1): {
+        "Adj": [
+            {
+                "state": (s2_gridworld, 2),
+                "A": {
+                    move_operator_pred('right'): 0.5,
+                }
+            },
+            {
+                "state": (s3_gridworld, 2),
+                "A": {move_operator_pred('right'): 0.5}
+            }
+        ]
+    },
+    (s3_gridworld, 2): {
+        "Adj": [{
+            "state": (s3_gridworld, 2),
+            "A": {
+                move_operator_pred('up'): 1,
+            }
+        }]
+    },
+}
+
+bpsg_3_extended = {
+    (s1_gridworld, 0): {
+        "Adj": [
+            {
+                "state": (s1_gridworld, 1),
+                "A": {
+                    move_operator_pred('right'): 0.5,
+                }
+            },
+            {
+                "state": (s2_gridworld, 1),
+                "A": {move_operator_pred('right'): 0.5}
+            }
+        ]
+    },
+    (s2_gridworld, 1): {
+        "Adj": [
+            {
+                "state": (s2_gridworld, 2),
+                "A": {
+                    move_operator_pred('right'): 0.5,
+                }
+            }
+        ]
+    },
+    (s3_gridworld, 2): {"Adj": []},
+}
+
+explicit_graph_extended = {
+    (s1_gridworld, 0): {
+        "value": 0.6826277,
+        "prob": 1,
+        "solved": True,
+        "expanded": False,
+        "pi": None,
+        "Adj": []
+    },
+}
+
+explicit_graph_extended_expanded = {
+    (s1_gridworld, 0): {
+        "value": 0.6826277,
+        "prob": 1,
+        "solved": False,
+        "expanded": True,
+        "pi": None,
+        "Adj": [
+            {
+                "state": (s1_gridworld, 1),
+                "A": {
+                    move_operator_pred('up'): 1,
+                    move_operator_pred('down'): 1,
+                    move_operator_pred('right'): 0.5,
+                }
+            },
+            {
+                "state": (s2_gridworld, 1),
+                "A": {move_operator_pred('right'): 0.5}
+            }
+        ]
+    },
+    (s1_gridworld, 1): {
+        "value": 0.6826277,
+        "prob": 1,
+        "solved": True,
+        "expanded": False,
+        "pi": None,
+        "Adj": []
+    },
+    (s2_gridworld, 1): {
+        "value": 0.82621287,
+        "prob": 1,
+        "solved": True,
+        "expanded": False,
+        "pi": None,
+        "Adj": []
+    }
+}
+
+bpsg_river_test = {
+    (river_states[3], 0): {
+        'Adj': [
+            {'name': (river_states[3], 1), 'A': {'W': 1}}
+        ]
+    },
+    (river_states[3], 1): {'Adj': []}
+}
+
+
+explicit_graph_river_test = {
+    (river_states[3], 0): {
+        "value": 0.2207276647028654,
+        "prob": 0.6,
+        "solved": False,
+        "expanded": True,
+        "pi": move_operator_pred('right'),
+        "Adj": [
+            {"state": (river_states[3], 1), "A": {move_operator_pred('left'): 1}},
+            {"state": (river_states[4], 1), "A": {move_operator_pred('right'): 1}},
+            {"state": (river_states[0], 1), "A": {move_operator_pred('up'): 1}},
+        ],
+    },
+    (river_states[3], 1): {
+        "solved": False,
+        "value": 0.2207276647028654,
+        "prob": 0.6,
+        "pi": move_operator_pred('right'),
+        "expanded": True,
+        "Adj": [
+            {"state": (river_states[3], 2), "A": {move_operator_pred('left'): 1}},
+            {"state": (river_states[4], 2), "A": {move_operator_pred('right'): 1}},
+            {"state": (river_states[0], 2), "A": {move_operator_pred('up'): 1}},
+        ],
+    },
+    (river_states[4], 1): {
+        "solved": True,
+        "value": 0.36391839582758007,
+        "prob": 0.6,
+        "pi": None,
+        "expanded": False,
+        "Adj": [],
+    },
+    (river_states[0], 1): {
+        "solved": True,
+        "value": 0.22313016014842985,
+        "prob": 1.0,
+        "pi": None,
+        "expanded": False,
+        "Adj": [],
+    },
+    (river_states[3], 2): {
+        "solved": True,
+        "value": 0.1353352832366127,
+        "prob": 1.0,
+        "pi": None,
+        "expanded": False,
+        "Adj": [],
+    },
+    (river_states[4], 2): {
+        "solved": True,
+        "value": 0.36391839582758007,
+        "prob": 0.6,
+        "pi": None,
+        "expanded": False,
+        "Adj": [],
+    },
+    (river_states[0], 2): {
+        "solved": True,
+        "value": 0.22313016014842985,
+        "prob": 1.0,
+        "pi": None,
+        "expanded": False,
+        "Adj": [],
+    },
+}
+
 
 def C_factory(goal):
     def C(s, a):
@@ -378,7 +636,23 @@ def C_factory(goal):
 
 C_test_domain = C_factory(goal_test_domain)
 C_test_domain_gridworld = C_factory(goal_test_domain_gridworld)
+C_river = C_factory(goal_river)
 
+init_gridworld, _ = env_test_domain_gridworld.reset()
+A_gridworld = np.array(
+            list(env_test_domain_gridworld.action_space.all_ground_literals(init_gridworld)))
+reach_gridworld = mdp.get_all_reachable(init_gridworld, A_gridworld, env_test_domain_gridworld)
+S_gridworld = list(sorted([s for s in reach_gridworld]))
+V_i_gridworld = {s: i for i, s in enumerate(S_gridworld)}
+
+succ_states_gridworld = {s: {} for s in reach_gridworld}
+for s in reach_gridworld:
+    for a in A_gridworld:
+        succ_states_gridworld[s, a] = reach_gridworld[s][a]
+
+V_risk_gridworld, P_risk_gridworld, pi_risk_gridworld, _ = gubs.dual_criterion(
+    lamb, V_i_gridworld, S_gridworld, goal_test_domain_gridworld, succ_states_gridworld, A_gridworld)
+C_maxs = gubs.get_cmax_reachable(init_gridworld, V_risk_gridworld, V_i_gridworld, P_risk_gridworld, pi_risk_gridworld, goal_test_domain_gridworld, A_gridworld, C_test_domain_gridworld, lamb, k_g, succ_states_gridworld)
 
 class TestMDPGraph(unittest.TestCase):
     def test_expand_state_dual_criterion(self):
@@ -495,14 +769,6 @@ class TestMDPGraph(unittest.TestCase):
         expanded_states = [
             s1_gridworld_2, s2_gridworld_2, s3_gridworld_2, s4_gridworld_2
         ]
-        #explicit_graph[init_state] = {
-        #    "value": 1,
-        #    "prob": 0,
-        #    "solved": False,
-        #    "expanded": False,
-        #    "pi": None,
-        #    **explicit_graph[init_state]
-        #}
 
         A = env_test_domain_gridworld_2.action_space.all_ground_literals(s1_gridworld_2)
         # mdp_ = deepcopy(graph_env_1)
@@ -515,7 +781,6 @@ class TestMDPGraph(unittest.TestCase):
             "pi": None,
             **explicit_graph[s1_gridworld_2]
         }
-        obs, *_ = env_test_domain_gridworld_2.reset()
         explicit_graph = mdp.expand_state_dual_criterion(s1_gridworld_2, h_1, h_1, env_test_domain_gridworld_2, explicit_graph, goal_test_domain_gridworld_2, A)
 
         # build graph and mark states as expanded
@@ -675,3 +940,106 @@ class TestMDPGraph(unittest.TestCase):
         assert new_explicit_graph_[s2]['value'] == np.exp(lamb)
         assert new_explicit_graph_[s2]['prob'] == 1
         assert new_explicit_graph_[s2]['pi'] == move1_operator_pred()
+
+    def test_update_partial_solution_extended(self):
+
+        explicit_ = deepcopy(explicit_graph_extended_expanded)
+        explicit_[(s1_gridworld, 0)]["pi"] = move_operator_pred('right')
+
+        #new_bpsg = mdp.update_partial_solution(s1_gridworld_2, bpsg_, explicit_graph)
+        new_bpsg = mdp.update_partial_solution_extended(
+            s1_gridworld, C_river, bpsg_extended, explicit_)
+
+        print('opa', new_bpsg[(s1_gridworld, 0)])
+        self.assertDictEqual(new_bpsg, {
+            (s1_gridworld, 0): {
+                "Adj": [
+                    {
+                        "state": (s1_gridworld, 1),
+                        "A": {move_operator_pred('right'): 0.5}
+                    },
+                    {
+                        "state": (s2_gridworld, 1),
+                        "A": {move_operator_pred('right'): 0.5}
+                    }
+                ]
+            },
+            (s2_gridworld, 1): {"Adj": []},
+            (s1_gridworld, 1): {"Adj": []},
+        })
+
+    def test_update_partial_solution_changes_extended(self):
+        #not_extended_expanded_states = [river_states[0], river_states[3], river_states[4]]
+        #not_extended_solved_states = [river_states[3]]
+
+        #mdp_obj = deepcopy(graph_env_river_test)
+        explicit_ = deepcopy(explicit_graph_river_test)
+        # mark states as expanded
+        #for s in not_extended_expanded_states:
+        #    explicit_[s]['expanded'] = True
+        #for s in not_extended_solved_states:
+        #    explicit_[s]['solved'] = True
+
+        new_bpsg = mdp.update_partial_solution_extended(river_states[3], C_river, bpsg_river_test, explicit_)
+
+        self.assertDictEqual(new_bpsg, {
+            (river_states[3], 0): {
+                'Adj': [
+                    {'state': (river_states[4], 1), 'A': {move_operator_pred('right'): 1}}
+                ]
+            },
+            (river_states[4], 1): {'Adj': []}
+        })
+
+
+
+    #def test_unexpanded_states_extended_1(self):
+    #    explicit_graph_extended_ = deepcopy(explicit_graph_extended)
+    #    explicit_graph_extended_[(s1_gridworld, 0)]["solved"] = False
+
+    #    unexpanded = mdp.get_unexpanded_states_extended(
+    #        goal_test_domain_gridworld, explicit_graph_extended_, bpsg_extended)
+    #    self.assertListEqual(unexpanded, [(s1_gridworld, 0)])
+
+    #def test_unexpanded_states_extended_2(self):
+    #    # Expand states '1' and '2':
+    #    explicit_ = mdp.expand_state_gubs(
+    #        (s1_gridworld, 0), env_test_domain_gridworld, goal_test_domain_gridworld, explicit_graph_extended, C_test_domain_gridworld, C_maxs, V_risk_gridworld, P_risk_gridworld, pi_risk_gridworld, V_i_gridworld, A_gridworld)
+    #    explicit_ = mdp.expand_state_gubs(
+    #        (s2_gridworld, 1), env_test_domain_gridworld, goal_test_domain_gridworld, explicit_, C_test_domain_gridworld, C_maxs, V_risk_gridworld, P_risk_gridworld, pi_risk_gridworld, V_i_gridworld, A_gridworld)
+
+    #    unexpanded = mdp.get_unexpanded_states_extended(
+    #        goal_test_domain_gridworld, explicit_, bpsg_2)
+    #    self.assertListEqual(unexpanded, [])
+
+    def test_unexpanded_states_extended_v2(self):
+        # Expand states '1' and '2':
+        pi_risk_ = {S_gridworld[i]: a for i, a in enumerate(pi_risk_gridworld)}
+        explicit_, C_maxs_ = mdp.expand_state_gubs_v2(
+            (s1_gridworld, 0), h_1, env_test_domain_gridworld, goal_test_domain_gridworld, explicit_graph_extended, C_test_domain_gridworld, C_maxs, V_risk_gridworld, P_risk_gridworld, pi_risk_, V_i_gridworld, A_gridworld, k_g, lamb)
+        explicit_, _ = mdp.expand_state_gubs_v2(
+            (s2_gridworld, 1), h_1, env_test_domain_gridworld, goal_test_domain_gridworld, explicit_, C_test_domain_gridworld, C_maxs_, V_risk_gridworld, P_risk_gridworld, pi_risk_, V_i_gridworld, A_gridworld, k_g, lamb)
+
+        unexpanded = mdp.get_unexpanded_states_extended(
+            goal_test_domain_gridworld, explicit_, bpsg_2)
+        self.assertListEqual(unexpanded, [])
+
+    def test_find_ancestors_extended(self):
+        ancestors, _ = mdp.find_ancestors_extended(
+            (s1_gridworld, 0), bpsg_extended, C_test_domain_gridworld)
+
+        self.assertListEqual(ancestors, [])
+
+    def test_find_ancestors_2_extended(self):
+        # Test for second bpsg example
+        ancestors_, _ = mdp.find_ancestors_extended(
+            (s3_gridworld, 2), bpsg_2_extended, C_test_domain_gridworld)
+        ancestors = set(ancestors_)
+        self.assertSetEqual(ancestors, set([(s1_gridworld, 0), (s2_gridworld, 1)]))
+
+    def test_find_ancestors_3_extended(self):
+        # Test for third bpsg example
+        ancestors_, _ = mdp.find_ancestors_extended(
+            (s2_gridworld, 1), bpsg_3_extended, C_test_domain_gridworld)
+        ancestors = set(ancestors_)
+        self.assertSetEqual(ancestors, set([(s1_gridworld, 0)]))

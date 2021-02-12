@@ -1,6 +1,7 @@
 import argparse
 import os
 import sys
+import time
 import gym
 import imageio
 import pddlgym
@@ -11,7 +12,7 @@ from datetime import datetime
 from pddlgym.inference import check_goal
 import mdp
 import gubs
-from utils import text_render
+import utils
 
 matplotlib.use('TkAgg')
 
@@ -61,9 +62,12 @@ def parse_args():
                         default=DEFAULT_KG,
                         help="Constant goal utility (default: %s)" %
                         str(DEFAULT_LAMBDA))
-    parser.add_argument('--algorithm', dest='algorithm', choices=['vi', 'vi-dualonly', 'ao-dualonly'],
+    parser.add_argument('--algorithm',
+                        dest='algorithm',
+                        choices=['vi', 'vi-dualonly', 'ao', 'ao-dualonly'],
                         default=DEFAULT_ALGORITHM,
-                        help="Algorithm to run (default: %s)" % DEFAULT_ALGORITHM)
+                        help="Algorithm to run (default: %s)" %
+                        DEFAULT_ALGORITHM)
     parser.add_argument(
         '--simulate',
         dest='simulate',
@@ -109,23 +113,12 @@ def parse_args():
 def run_episode(pi,
                 env,
                 n_steps=50,
-                render_and_save=False,
-                output_dir=".",
+                output_dir=None,
                 print_history=False,
                 keep_cost=False):
     obs, _ = env.reset()
 
-    # Create folder to save images
-    if render_and_save:
-        output_outdir = args.output_dir
-        domain_name = env.domain.domain_name
-        problem_name = domain_name + str(
-            env._problem_idx) if env._problem_index_fixed else None
-        output_dir = os.path.join(output_outdir, domain_name, problem_name,
-                                  f"{str(datetime.now().timestamp())}")
-        if not os.path.isdir(output_dir):
-            os.makedirs(output_dir)
-
+    render_and_save = output_dir != None
     if render_and_save:
         img = env.render()
         imageio.imsave(os.path.join(output_dir, f"frame1.png"), img)
@@ -137,10 +130,10 @@ def run_episode(pi,
             pi(obs) if not keep_cost else pi(obs, i - 1))
         cum_reward += reward
         if print_history:
-            state_text_render = text_render(env, old_obs)
+            state_text_render = utils.text_render(env, old_obs)
             if state_text_render:
                 print("State:", state_text_render)
-            print(" ",pi(old_obs), reward)
+            print(" ", pi(old_obs), reward)
 
         if render_and_save:
             img = env.render()
@@ -150,8 +143,10 @@ def run_episode(pi,
             break
     return i, cum_reward
 
+
 def h_1(_):
     return 1
+
 
 args = parse_args()
 
@@ -163,10 +158,11 @@ goal = problem.goal
 prob_objects = frozenset(problem.objects)
 
 obs, _ = env.reset()
-A = np.array(list(sorted(env.action_space.all_ground_literals(obs, valid_only=False))))
-
+A = np.array(
+    list(sorted(env.action_space.all_ground_literals(obs, valid_only=False))))
 
 print('obtaining optimal policy')
+start = time.time()
 if args.algorithm == 'vi-dualonly' or args.algorithm == 'vi':
     print(' calculating list of states...')
     reach = mdp.get_all_reachable(obs, A, env)
@@ -182,7 +178,8 @@ if args.algorithm == 'vi-dualonly' or args.algorithm == 'vi':
         for a in A:
             succ_states[s, a] = reach[s][a]
 
-    V_dual, P_dual, pi_dual, i_dual = gubs.dual_criterion(args.lamb, V_i,
+    V_dual, P_dual, pi_dual, i_dual = gubs.dual_criterion(args.lamb,
+                                                          V_i,
                                                           S,
                                                           goal,
                                                           succ_states,
@@ -190,45 +187,46 @@ if args.algorithm == 'vi-dualonly' or args.algorithm == 'vi':
                                                           epsilon=args.epsilon)
 
     if args.algorithm == 'vi':
-        C_max = gubs.get_cmax(V_dual, V_i, P_dual, S, succ_states, A, args.lamb,
-                              args.k_g)
-        V, P, pi = gubs.egubs_vi(V_dual, P_dual, pi_dual, C_max, args.lamb, args.k_g,
-                                 V_i, S, goal, succ_states, A)
-        pi_func = lambda s, C: pi[V_i[s], C] if C < pi.shape[1] else pi[V_i[s], -1]
+        C_max = gubs.get_cmax(V_dual, V_i, P_dual, S, succ_states, A,
+                              args.lamb, args.k_g)
+        V, P, pi = gubs.egubs_vi(V_dual, P_dual, pi_dual, C_max, args.lamb,
+                                 args.k_g, V_i, S, goal, succ_states, A)
+        pi_func = lambda s, C: pi[V_i[s], C] if C < pi.shape[1] else pi[V_i[s],
+                                                                        -1]
     else:
         pi_func = lambda s: pi_dual[V_i[s]]
-        print(obs, V_dual[V_i[obs]], P_dual[V_i[obs]], pi_dual[V_i[obs]])
+        n_updates = i_dual * len(S)
+        #print(obs, V_dual[V_i[obs]], P_dual[V_i[obs]], pi_dual[V_i[obs]])
 elif args.algorithm == 'ao-dualonly':
-    explicit_graph, bpsg, n_iter = mdp.lao_dual_criterion(obs, h_1, h_1, goal, A, args.lamb, env, args.epsilon)
+    explicit_graph, bpsg, n_updates = mdp.lao_dual_criterion(
+        obs, h_1, h_1, goal, A, args.lamb, env, args.epsilon)
 
     pi_func = lambda s: explicit_graph[s]['pi']
-    print(obs, explicit_graph[obs]['value'], explicit_graph[obs]['prob'], explicit_graph[obs]['pi'])
+    #print(obs, explicit_graph[obs]['value'], explicit_graph[obs]['prob'], explicit_graph[obs]['pi'])
+elif args.algorithm == 'ao':
+    explicit_graph, bpsg, explicit_graph_dc, n_updates, n_updates_dc, _ = mdp.egubs_ao(
+        obs, h_1, h_1, goal, A, args.k_g, args.lamb, env, args.epsilon)
 
-#V = np.zeros(len(explicit_graph))
-#P = np.zeros(len(explicit_graph))
-#pi = np.full(len(explicit_graph), None)
-#state_coords = {}
-#nx = 0
-#ny = 0
-#for s, v in explicit_graph.items():
-#    state_name = [lit for lit in s.literals if lit.predicate.name.startswith('robot-at')][0].variables[1].name
-#    state_x, state_y = [int(s) for s in state_name[1:-1].split('-')]
-#    state_coords[s] = (state_x, state_y)
-#    nx = max(nx, state_x + 1)
-#    ny = max(ny, state_y + 1)
-#
-#print(nx, ny)
-#for s, (x, y) in state_coords.items():
-#    state_i = y * nx + x
-#    print((x, y), state_i)
-#    V[state_i] = explicit_graph[s]['value']
-#    P[state_i] = explicit_graph[s]['prob']
-#    pi[state_i] = explicit_graph[s]['pi']
-#
-#print(V.reshape(ny, nx))
-#print(P.reshape(ny, nx))
-#print(pi.reshape(ny, nx))
+    solved_states = [s for s, v in explicit_graph_dc.items() if v['solved']]
+    #print('Solved states:')
+    #for s in solved_states:
+    #    render = utils.text_render(env, s)
+    #    print(' ', render if render else s)
+    #print('Solved states:', len(solved_states))
+    #print('Size explicit graph dc:', len(explicit_graph_dc))
+final_time = time.time() - start
 
+print("Final updates:", n_updates)
+res = {(utils.get_coord_from_state(k[0]), k[1]): [
+    explicit_graph[k]['value'] if k in explicit_graph else None,
+    explicit_graph[k]['prob'] if k in explicit_graph else None,
+    explicit_graph[k]['value'] +
+    args.k_g * explicit_graph[k]['prob'] if k in explicit_graph else None,
+    explicit_graph[k]['pi'] if k in explicit_graph else None
+]
+       for k in bpsg}
+
+print('res: ', res)
 
 n_episodes = 500
 
@@ -258,8 +256,12 @@ if args.plot_stats:
 
     plt.figure()
     plt.title('Average reward')
-    plt.plot(range(len(rewards1)), np.cumsum(rewards1) / np.arange(1, n_episodes + 1), label="optimal")
-    plt.plot(range(len(rewards1)), np.cumsum(rewards2) / np.arange(1, n_episodes + 1), label="random")
+    plt.plot(range(len(rewards1)),
+             np.cumsum(rewards1) / np.arange(1, n_episodes + 1),
+             label="optimal")
+    plt.plot(range(len(rewards1)),
+             np.cumsum(rewards2) / np.arange(1, n_episodes + 1),
+             label="random")
     plt.legend()
 
     plt.figure()
@@ -269,11 +271,41 @@ if args.plot_stats:
     plt.legend()
     plt.show()
 
+output_dir = None
+# Create folder to save images
+if args.render_and_save:
+    output_outdir = args.output_dir
+    domain_name = env.domain.domain_name
+    problem_name = domain_name + str(
+        env._problem_idx) if env._problem_index_fixed else None
+    output_dir = os.path.join(output_outdir, domain_name, problem_name,
+                              f"{str(datetime.now().timestamp())}")
+    if not os.path.isdir(output_dir):
+        os.makedirs(output_dir)
+
 if args.simulate:
     _, goal = run_episode(pi_func,
                           env,
                           n_steps=50,
-                          render_and_save=args.render_and_save,
-                          output_dir=args.output_dir,
+                          output_dir=output_dir,
                           print_history=args.print_sim_history,
                           keep_cost=False)
+
+for k, v in explicit_graph.items():
+    if 'parents' in v:
+        explicit_graph[k]['parents'] = list(explicit_graph[k]['parents'])
+explicit_graph_new_keys = {(str(k) if type(k) == tuple else k): v
+                           for k, v in explicit_graph.items()}
+
+if args.render_and_save:
+    output_filename = str(datetime.time(datetime.now())) + '.json'
+    output_file_path = utils.output(
+        output_filename, {
+            **vars(args), 'cpu_time': final_time,
+            'n_updates': n_updates,
+            'n_updates_dc': n_updates_dc,
+            'explicit_graph': explicit_graph_new_keys,
+            'explicit_graph_dc': explicit_graph_dc
+        })
+    if output_file_path:
+        print("Algorithm result written to ", output_file_path)

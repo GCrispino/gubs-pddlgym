@@ -1,5 +1,6 @@
 import itertools
 from utils import get_values
+import utils
 import numpy as np
 from pddlgym.inference import check_goal
 
@@ -19,7 +20,7 @@ def dual_criterion(lamb, V_i, S, goal, succ_states, A, c=1, epsilon=1e-3, n_iter
     if not isinstance(A, np.ndarray):
         A = np.array(A)
 
-    i = 0
+    i = 1
 
     P_not_max_prob = np.copy(P)
     while True:
@@ -47,8 +48,8 @@ def dual_criterion(lamb, V_i, S, goal, succ_states, A, c=1, epsilon=1e-3, n_iter
 
             actions_results = np.array([
                 np.sum([
-                    u(c) * V[V_i[s_]] * p for s_, p in all_reachable[i].items()
-                ]) for i in i_A_max_prob
+                    u(c) * V[V_i[s_]] * p for s_, p in all_reachable[j].items()
+                ]) for j in i_A_max_prob
             ])
 
             i_a = np.argmax(actions_results)
@@ -126,6 +127,35 @@ def get_cmax(V, V_i, P, S, succ_states, A, lamb, k_g, c=1):
 
     return int(np.ceil(C_max))
 
+def get_cmax_all(V, V_i, P, S, A, lamb, k_g, succ_states, c=1):
+
+    X = get_X(V, V_i, lamb, S, succ_states, A)
+    #print("X:", X)
+    W = {}
+
+    for (s, a), x in X:
+        #denominator = k_g * (np.sum(np.fromiter((s_['A'][a] * P[V_i[s_['name']]]
+        #                                         for s_ in mg.find_reachable(s, a, mdp_obj)), dtype=float)) - P[V_i[s]])
+        denominator = k_g * (np.sum(np.fromiter((p * P[V_i[s_]]
+                                                 for s_, p in succ_states[s, a].items()), dtype=float)) - P[V_i[s]])
+        if denominator == 0:
+            if s not in W:
+                W[s] = {a: 0}
+            W[s][a] = 0
+        else:
+            w = -(1 / lamb) * np.log(
+                x / denominator
+            )
+            if not np.isnan(w):
+                val = max(0, np.ceil(w).astype(int))
+                if s not in W:
+                    W[s] = {a: val}
+                W[s][a] = val
+
+    return W
+
+
+
 def egubs_vi(V_dual, P_dual, pi_dual, C_max, lamb, k_g, V_i, S, goal, succ_states, A, c=1):
     G_i = [V_i[s] for s in V_i if check_goal(s, goal)]
     n_states = len(S)
@@ -177,3 +207,145 @@ def egubs_vi(V_dual, P_dual, pi_dual, C_max, lamb, k_g, V_i, S, goal, succ_state
             V[i_s, C] = V_dual_C[i_s, C] + k_g * P[i_s, C]
 
     return V, P, pi
+
+def W(s, a, V_diff, V_i, P, k_g, lamb, succ_states):
+    #denominator = k_g * (np.sum(np.fromiter((s_['A'][a] * P[V_i[s_['name']]]
+    #                                         for s_ in mg.find_reachable(s, a, mdp_obj)), dtype=float)) - P[V_i[s]])
+    denominator = k_g * (np.sum(np.fromiter((p * P[V_i[s_]]
+                                             for s_, p in succ_states[s, a].items()), dtype=float)) - P[V_i[s]])
+
+    W = None
+    if denominator == 0:
+        W = 0
+    else:
+        W = -(1 / lamb) * np.log(
+            V_diff / denominator
+        )
+        if not np.isnan(W):
+            W = max(0, np.ceil(W).astype(int))
+        else:
+            W = 0
+
+    return W
+
+def can_improve(V, V_i, s, a, C, lamb, succ_states):
+    reachable = succ_states[s, a]
+
+    V_diff = V[V_i[s]] - np.sum(
+        np.fromiter(
+            (p * np.exp(lamb * C(s, a)) * V[V_i[s_]]
+             for s_, p in reachable.items()), dtype=float))
+
+    return V_diff < 0, V_diff
+
+def get_w_reachable(s, V_risk, V_i, P, pi_risk, goal, A, C, lamb, k_g, succ_states, visited=None, W_s=None):
+    if check_goal(s, goal):
+        return {s: 0}
+
+    # Setup
+    # =================================================
+    W_s = W_s or {}
+
+    visited = visited if visited else set()
+    visited.add(s)
+    # a_opt = pi_risk[s]
+
+    # reachable = map(lambda _s: _s, mdp_obj[s]['Adj'])
+    # reachable_by_actions = {_s['name']: _s['A'] for _s in mdp_obj[s]['Adj']}
+    reachable_by_actions = {}
+    for a in A:
+        for s_ in succ_states[s, a]:
+            if s_ not in reachable_by_actions:
+                reachable_by_actions[s_] = set()
+            reachable_by_actions[s_].add(a)
+
+    # =================================================
+
+    # Find state-action pairs that can improve expected utility
+    # =================================================
+    candidates = []
+    for a in A:
+        can, V_diff = can_improve(V_risk, V_i, s, a, C, lamb, succ_states)
+        if can:
+            candidates.append((a, V_diff))
+    # =================================================
+
+    # Find max cost for current state and recursively
+    #   compute costs for reachable states
+    # =================================================
+    W_a = [W(s, a, V_diff, V_i, P, k_g, lamb, succ_states)
+           for a, V_diff in candidates]
+
+    W_max_a = max(W_a, default=0)
+    W_reachable = []
+    for s_, A_ in reachable_by_actions.items():
+        if s_ not in visited and s_ not in W_s:
+            W_s = {
+                **W_s,
+                **get_w_reachable(
+                    s_, V_risk, V_i, P, pi_risk, goal, A, C, lamb, k_g, succ_states, visited, W_s)
+            }
+            # Go through each action a that can lead to s_
+            #   and get maximum difference between W_s[s_] and C(s, a)
+            W_reachable.append(
+                max([W_s[s_] - C(s, a) for a in A_])
+            )
+
+    W_reachable_max = max(W_reachable, default=0)
+
+    W_s[s] = W_max_a \
+        if (W_max_a >= W_reachable_max) \
+        else W_reachable_max
+
+    return W_s
+
+
+def __get_cmax_reachable(V_risk, P, pi_risk, goal, A, C, lamb, k_g, W_s, succ_states):
+    C_maxs_s = {}
+
+    for s in W_s:
+        if check_goal(s, goal):
+            if s not in C_maxs_s:
+                C_maxs_s[s] = 0
+            continue
+        #reachable_by_actions = {_s['name']: _s['A']
+        #                        for _s in mdp_obj[s]['Adj']}
+        reachable_by_actions = {}
+        for a in A:
+            for s_ in succ_states[s, a]:
+                if s_ not in reachable_by_actions:
+                    reachable_by_actions[s_] = set()
+                reachable_by_actions[s_].add(a)
+
+        w_s = W_s[s]
+        C_max_reachable = []
+        for s_, A_ in reachable_by_actions.items():
+            # Go through each action a that can lead to s_
+            #   and get maximum difference between W_s[s_] and C(s, a)
+            C_max_reachable.append(
+                max([W_s[s_] - C(s, a) for a in A_])
+            )
+        C_max_reachable_max = max(C_max_reachable, default=0)
+
+        C_maxs_s[s] = w_s \
+            if (w_s >= C_max_reachable_max) \
+            else C_max_reachable_max
+
+    return C_maxs_s
+
+def get_cmax_reachable(s, V_risk, V_i, P, pi_risk, goal, A, C, lamb, k_g, succ_states, visited=None, W_s=None):
+    if check_goal(s, goal):
+        return {s: 0}
+    W_s = W_s or {}
+    i = 0
+    W_s = get_w_reachable(
+        s, V_risk, V_i, P, pi_risk, goal, A, C, lamb, k_g, succ_states, W_s=W_s)
+    old_C_maxs_s = {}
+    C_maxs_s = W_s
+    while old_C_maxs_s != C_maxs_s:
+        old_C_maxs_s = C_maxs_s
+        C_maxs_s = __get_cmax_reachable(
+            V_risk, P, pi_risk, goal, A, C, lamb, k_g, C_maxs_s, succ_states)
+        i += 1
+    return C_maxs_s
+

@@ -1,5 +1,6 @@
 from copy import copy
-from utils import text_render
+import gubs
+from utils import text_render, flatten
 import numpy as np
 from pddlgym.core import get_successor_states, InvalidAction
 from pddlgym.inference import check_goal
@@ -120,12 +121,141 @@ def expand_state_dual_criterion(s, h_v, h_p, env, explicit_graph, goal, A):
 
     return new_explicit_graph
 
+def expand_state_gubs(s, env, goal, explicit_graph, C, C_maxs, V_risk, P_risk, pi_risk, V_i, A):
+    if check_goal(s[0], goal):
+        raise ValueError(
+            f'State {s[0]} can\'t be expanded because it is a goal state')
+
+    # Get 's' neighbour states that were not expanded
+    #    and "collapse" equal (s, C) pairs
+    neighbour_states_dict = {}
+    neighbour_states = []
+
+    i = 0
+    for a in A:
+        succs = get_successor_states_check_exception(s[0], a, env.domain)
+        for s_, p in succs.items():
+            c_ = C(s_, a)
+            if (s_, c_) not in neighbour_states_dict:
+                neighbour_states_dict[(s_, c_)] = i
+                i += 1
+                neighbour_states.append({'state': (s_, c_), 'A': {a: p}})
+            else:
+                neighbour_states[neighbour_states_dict[(s_, c_)]]['A'][a] = p
+
+    unexpanded_neighbours = list(filter(
+        lambda _s: ((_s['state'] not in explicit_graph) or (not explicit_graph[_s['state']]['expanded'])), neighbour_states))
+
+    # Add new empty states to 's' adjacency list
+    new_explicit_graph = copy(explicit_graph)
+    new_explicit_graph[s]["Adj"].extend(neighbour_states)
+
+    #new_mdp = deepcopy(mdp)
+    for neigh in unexpanded_neighbours:
+        n = neigh['state']
+        print(n, type(n))
+        # Check if maximum cost for state was reached
+        c_max_n = max([C_maxs[n[0]][a]
+                       for a in C_maxs[n[0]]]) if n[0] in C_maxs else 0
+
+        solved = n[1] >= c_max_n
+        value = V_risk[V_i[n[0]]] if solved else 1
+        prob = P_risk[V_i[n[0]]]
+        new_explicit_graph[n] = {
+            "solved": solved,
+            "value": value,
+            "prob": prob,
+            "pi": pi_risk[V_i[n[0]]],
+            "expanded": False,
+            "Adj": []
+        }
+
+    new_explicit_graph[s]['expanded'] = True
+
+    return new_explicit_graph
+
+def expand_state_gubs_v2(s, h, env, goal, explicit_graph, C, C_maxs, V_risk, P_risk, pi_risk, V_i, A, k_g, lamb):
+    if check_goal(s[0], goal):
+        raise ValueError(
+            f'State {s[0]} can\'t be expanded because it is a goal state')
+
+    # Get 's' neighbour states that were not expanded
+    #    and "collapse" equal (s, C) pairs
+    neighbour_states_dict = {}
+    neighbour_states = []
+
+    i = 0
+    for a in A:
+        succs = get_successor_states_check_exception(s[0], a, env.domain)
+        for s_, p in succs.items():
+            c_ = s[1] + C(s_, a)
+            if (s_, c_) not in neighbour_states_dict:
+                neighbour_states_dict[(s_, c_)] = i
+                i += 1
+                neighbour_states.append({'state': (s_, c_), 'A': {a: p}})
+            else:
+                neighbour_states[neighbour_states_dict[(s_, c_)]]['A'][a] = p
+
+
+    unexpanded_neighbours = list(filter(
+        lambda _s: ((_s['state'] not in explicit_graph) or (not explicit_graph[_s['state']]['expanded'])), neighbour_states))
+    expanded_neighbours = list(filter(
+        lambda _s: ((_s['state'] in explicit_graph) and explicit_graph[_s['state']]['expanded']), neighbour_states))
+
+    # Add new empty states to 's' adjacency list
+    new_explicit_graph = copy(explicit_graph)
+
+    new_explicit_graph[s]["Adj"].extend(neighbour_states)
+
+    for neigh in expanded_neighbours:
+        n = neigh['state']
+        if s not in new_explicit_graph[n]['parents']:
+            new_explicit_graph[n]['parents'].add(s)
+
+    for neigh in unexpanded_neighbours:
+        n = neigh['state']
+        # Check if maximum cost for state is known and was reached
+        if n[0] not in C_maxs:
+            raise NotImplementedError()
+            # Compute succ states
+            #C_maxs = gubs.get_cmax_reachable(
+            #    n[0], V_risk, V_i, P_risk, pi_risk, goal, A, C, lamb, k_g, succ_states, W_s=C_maxs)
+        else:
+            c_max_n = C_maxs[n[0]]
+
+        solved = bool(check_goal(n[0], goal) or n[1] >= c_max_n)
+        value = V_risk[V_i[n[0]]] if solved else h(n[0])
+        prob = P_risk[V_i[n[0]]]
+        pi = pi_risk[n[0]] if solved else None
+        if n in new_explicit_graph:
+            new_explicit_graph[n]['parents'].add(s)
+        else:
+            new_explicit_graph[n] = {
+                "solved": solved,
+                "value": value,
+                "prob": prob,
+                "pi": pi,
+                "expanded": False,
+                "Adj": [],
+                "parents": set([s])
+            }
+
+    new_explicit_graph[s]['expanded'] = True
+
+    return new_explicit_graph, C_maxs
+
 
 def get_unexpanded_states(goal, explicit_graph, bpsg):
     return list(
         filter(
             lambda x: (x not in explicit_graph) or (not explicit_graph[x]["expanded"] and not check_goal(
                 x, goal)), bpsg.keys()))
+
+def get_unexpanded_states_extended(goal, explicit_graph, bpsg):
+    return list(
+        filter(lambda x: x in explicit_graph and not explicit_graph[x]['expanded'] and not explicit_graph[x]["solved"]
+               and not check_goal(x[0], goal), bpsg.keys())
+    )
 
 def find_reachable(s, a, mdp):
     """ Find states that are reachable from state 's' after executing action 'a' """
@@ -167,6 +297,51 @@ def __find_ancestors(s, bpsg, visited, best):
 def find_ancestors(s, bpsg, best=False):
     return __find_ancestors(s, bpsg, set(), best)
 
+def find_direct_ancestors_extended(s, graph, best=False):
+    return list(filter(
+        lambda s_: s_ != s and len(
+            list(filter(
+                lambda s__: s__['state'] == s and (
+                    True
+                    if not best
+                    else graph[s_]['pi'] in s__['A']
+                ),
+                graph[s_]['Adj']
+            ))
+        ) > 0,
+        graph[s]['parents'] if 'parents' in graph[s] else graph
+    ))
+
+
+def __find_ancestors_extended(s, bpsg, visited, C, best=False, sorting=None):
+    sorting = [] if sorting == None else sorting
+    direct_ancestors = list(filter(
+        lambda a: a not in visited,
+        find_direct_ancestors_extended(s, bpsg, best)
+    ))
+
+    result = [] + direct_ancestors
+
+    for a in direct_ancestors:
+        if a not in visited:
+            visited.add(a)
+            result_, _ = __find_ancestors_extended(
+                a, bpsg, visited, C, best, sorting)
+            result += result_
+    sorting.append(s)
+
+    return result, sorting
+
+
+def find_ancestors_extended(s, bpsg, C, best=False):
+    return __find_ancestors_extended(s, bpsg, set(), C, best)
+
+
+def find_neighbours(s, adjs):
+    """ Find neighbours of s in adjacency list (except itself) """
+    return list(
+        map(lambda s_: s_['state'],
+            filter(lambda s_: s_['state'] != s, adjs)))
 
 def find_unreachable(s0, mdp):
     """ search for unreachable states using dfs """
@@ -216,6 +391,14 @@ def dfs(mdp, fn=None):
             dfs_visit(i, colors, d, f, time, S, V_i, mdp, fn)
 
     return d, f, colors
+
+def topological_sort(mdp):
+    stack = []
+
+    def dfs_fn(s):
+        stack.append(s)
+    dfs(mdp, dfs_fn)
+    return list(reversed(stack))
 
 def update_action_partial_solution(s, s0, a, bpsg, explicit_graph):
     """
@@ -276,6 +459,79 @@ def update_partial_solution(s0, bpsg, explicit_graph):
 
     return bpsg_
 
+def update_action_partial_solution_extended(s, s0, C, a, bpsg, explicit_graph):
+    """
+        Updates partial solution given pair of state and action
+    """
+    bpsg_ = copy(bpsg)
+    i = 0
+    states = [s]
+    while len(states) > 0:
+        s = states.pop()
+        # a = pi[V_i[s[0]], s[1]]
+        a = explicit_graph[s]['pi']
+        s_obj = bpsg_[s]
+
+        s_obj['Adj'] = []
+        #reachable = find_reachable(s[0], a, mdp)
+        reachable = find_reachable(s, a, explicit_graph)
+
+        for s_obj_ in reachable:
+            s_ = s_obj_['state']
+            #c_ = s[1] + C(s[0], a)
+            #s_extended = (s_, c_)
+            s_obj['Adj'].append({
+                'state': s_,
+                'A': {a: s_obj_['A'][a]}
+            })
+
+            #if s_extended not in bpsg_:
+            if s_ not in bpsg_:
+
+                #bpsg_[s_extended] = {
+                bpsg_[s_] = {
+                    "Adj": []
+                }
+                bpsg_[s] = s_obj
+
+                #if s_extended in explicit_graph and explicit_graph[s_extended]['expanded']:
+                if s_ in explicit_graph and explicit_graph[s_]['expanded']:
+                    states.append(s_)
+        i += 1
+
+    unreachable = find_unreachable((s0, 0), bpsg_)
+
+    for s_ in unreachable:
+        if s_ in bpsg_:
+            bpsg_.pop(s_)
+
+    return bpsg_
+
+
+def update_partial_solution_extended(s0, C, bpsg, explicit_graph):
+    bpsg_ = copy(bpsg)
+    S = explicit_graph.keys()
+
+    for s in S:
+        a = explicit_graph[s]['pi']
+        if s not in bpsg_:
+            continue
+
+        s_obj = bpsg_[s]
+
+        if len(s_obj['Adj']) == 0:
+            if a is not None:
+                bpsg_ = update_action_partial_solution_extended(
+                    s, s0, C, a, bpsg_, explicit_graph)
+        else:
+            best_current_action = next(iter(s_obj['Adj'][0]['A'].keys()))
+
+            if a is not None and best_current_action != a:
+                bpsg_ = update_action_partial_solution_extended(
+                    s, s0, C, a, bpsg_, explicit_graph)
+
+    return bpsg_
+
 
 def value_iteration_dual_criterion(explicit_graph,
                                    bpsg,
@@ -314,6 +570,7 @@ def value_iteration_dual_criterion(explicit_graph,
     changed = False
     converged = False
     n_updates = 0
+    np.seterr(all='raise')
     while True:
         for s in Z:
             if explicit_graph[s]['solved']:
@@ -351,6 +608,8 @@ def value_iteration_dual_criterion(explicit_graph,
             V_[V_i[s]] = actions_results[i_a]
             pi_[V_i[s]] = A_max_prob[i_a]
 
+        #print(V_i.values())
+        #print(len(V_i))
         v_norm = np.linalg.norm(V_[list(V_i.values())] - V[list(V_i.values())],
                                 np.inf)
         p_norm = np.linalg.norm(P_[list(V_i.values())] - P[list(V_i.values())],
@@ -417,9 +676,11 @@ def lao_dual_criterion(s0,
     def C(s, a):
         return 0 if check_goal(s, goal) else 1
 
-    i = 0
-    unexpanded = [s0]
+    i = 1
+    #unexpanded = [s0]
+    unexpanded = get_unexpanded_states(goal, explicit_graph, bpsg)
     n_updates = 0
+    explicit_graph_cur_size = 1
     while True:
         while len(unexpanded) > 0:
             s = unexpanded[0]
@@ -428,7 +689,9 @@ def lao_dual_criterion(s0,
             explicit_graph = expand_state_dual_criterion(
                 s, h_v, h_p, env, explicit_graph, goal, A)
             Z = [s] + find_ancestors(s, explicit_graph, best=True)
-            print("explicit graph size:", len(explicit_graph))
+            assert len(explicit_graph) >= explicit_graph_cur_size
+            explicit_graph_cur_size = len(explicit_graph)
+            print("explicit graph size:", explicit_graph_cur_size)
             print("Z size:", len(Z))
             explicit_graph, _, n_updates_ = value_iteration_dual_criterion(
                 explicit_graph, bpsg, A, Z, goal, lamb, C, epsilon=epsilon)
@@ -458,3 +721,213 @@ def lao_dual_criterion(s0,
     for s_ in bpsg:
         explicit_graph[s_]['solved'] = True
     return explicit_graph, bpsg, n_updates
+
+def lao_dual_criterion_reachable(s0, h_v, h_p, goal, A, lamb, env, epsilon=1e-3):
+    #all_reachable = mg.find_all_reachable(s0, mdp_obj)
+    all_reachable = set({s0})
+    explicit_graph = {}
+
+    stack = [s0]
+    n_updates_total = 0
+    while len(stack) > 0:
+        s = stack.pop()
+        print("Will call lao_dual_criterion for state:", text_render(env, s))
+        explicit_graph, _, n_updates = lao_dual_criterion(
+            s, h_v, h_p, goal, A, lamb, env, epsilon=epsilon, explicit_graph=explicit_graph)
+        n_updates_total += n_updates
+        print(' finished lao dual criterion for', s, len(
+            [v for v in explicit_graph.values() if v['solved']]))
+        for s_ in explicit_graph:
+            if s_ not in all_reachable:
+                all_reachable.add(s_)
+                stack.append(s_)
+
+    #pi = {s: explicit_graph[s]['pi']
+    #      for s in sorted(explicit_graph, key=int)}
+    #print(' pi:', pi)
+    return explicit_graph, n_updates_total
+
+def value_iteration_gubs(explicit_graph, V_i, A, Z, k_g, lamb, C):
+    n_actions = len(A)
+    changed = False
+    stack = copy(Z)
+    z_graph = {stack[0]: {'Adj': []}}
+
+    i = 0
+    while len(stack) > 0:
+        s = stack.pop(0)
+        z_graph.pop(s)
+
+        if explicit_graph[s]['solved']:
+            print("SOLVED", s)
+            continue
+        c = s[1]
+        q_actions_results = np.zeros(n_actions)
+        p_actions_results = np.zeros(n_actions)
+        all_reachable = []
+        for i_a, a in enumerate(A):
+            c_s_a = C(s[0], a)
+            #c_ = c + c_s_a
+            #reachable = find_reachable(s[0], a, mdp_obj)
+            reachable = find_reachable(s, a, explicit_graph)
+            all_reachable.append(reachable)
+
+            # Get value
+            #gen_q = (s_['A'][a] * explicit_graph[(s_['name'], c_)]['value']
+                     #for s_ in reachable)
+            gen_q = (s_['A'][a] * explicit_graph[s_['state']]['value']
+                     for s_ in reachable)
+            q_actions_results[i_a] = np.exp(lamb * c_s_a) * \
+                np.sum(np.fromiter(gen_q, dtype=np.float))
+
+            # Get probability
+            #gen_p = (s_['A'][a] * explicit_graph[(s_['name'], c_)]['prob']
+            #         for s_ in reachable)
+            gen_p = (s_['A'][a] * explicit_graph[s_['state']]['prob']
+                     for s_ in reachable)
+            p_actions_results[i_a] = np.sum(
+                np.fromiter(gen_p, dtype=np.float)
+            )
+
+        i_a_opt = np.argmax(
+            np.exp(lamb * c) * q_actions_results + k_g * p_actions_results
+        )
+
+        reachable_opt = all_reachable[i_a_opt]
+        c_s_a = C(s[0], A[i_a_opt])
+        c_ = c + c_s_a
+        #is_solved = all([explicit_graph[(r['name'], c_)]['solved']
+        #                 for r in reachable_opt])
+        is_solved = all([explicit_graph[r['state']]['solved']
+                         for r in reachable_opt])
+
+        old_val = explicit_graph[s]['value']
+        if explicit_graph[s]['value'] != q_actions_results[i_a_opt]:
+            explicit_graph[s]['value'] = q_actions_results[i_a_opt]
+            changed = True
+        if explicit_graph[s]['prob'] != p_actions_results[i_a_opt]:
+            explicit_graph[s]['prob'] = p_actions_results[i_a_opt]
+            changed = True
+        if explicit_graph[s]['pi'] != A[i_a_opt]:
+            explicit_graph[s]['pi'] = A[i_a_opt]
+            changed = True
+
+        if is_solved:
+            print(f"{s} is now solved!")
+        explicit_graph[s]['solved'] = is_solved
+
+        if explicit_graph[s]['value'] < old_val or is_solved:
+            # Label as solved and add ancestors to stack
+            ancestors = [a for a in find_direct_ancestors_extended(
+                s, explicit_graph, best=True) if a not in stack]
+            if len(ancestors) > 0:
+                # print(
+                #     f"Mudou no estado {s}! Adiciona os seguintes à lista:", ancestors, [explicit_graph[a]['pi'] for a in ancestors])
+                s_adj_obj = {'state': s}
+                for a in ancestors:
+                    if a not in z_graph:
+                        z_graph[a] = {}
+                    if 'Adj' not in z_graph[a]:
+                        z_graph[a]['Adj'] = []
+                    z_graph[a]['Adj'].append(copy(s_adj_obj))
+                stack = list(reversed(topological_sort(z_graph)))
+                # print('  Nova lista:', stack)
+
+        i += 1
+    return explicit_graph, i, changed
+
+def egubs_ao(s0, h_v, h_p, goal, A, k_g, lamb, env, epsilon=1e-3):
+    explicit_graph_dc, n_updates_dc = lao_dual_criterion_reachable(
+        s0, h_v, h_p, goal, A, lamb, env, epsilon)
+
+    V_risk = {s: explicit_graph_dc[s]['value']
+              for s in explicit_graph_dc}
+    P_risk = {s: explicit_graph_dc[s]['prob']
+              for s in explicit_graph_dc}
+    pi_risk = {s: explicit_graph_dc[s]['pi']
+               for s in explicit_graph_dc}
+    V_i = {s: s for s in V_risk}
+
+    def C(s, a): return 0 if check_goal(s, goal) else 1
+
+    # Criar succ_states a partir do explicit_graph_dc
+    # TODO -> Imprimir esse cara pra uma instância do rio e ver se ta certo
+    succ_states = {}
+    for s_ in explicit_graph_dc:
+        for s__ in explicit_graph_dc[s_]['Adj']:
+            for a, p in s__['A'].items():
+                if (s_, a) not in succ_states:
+                    succ_states[s_, a] = {}
+                if s__['state'] not in succ_states[s_, a]:
+                    succ_states[s_, a][s__['state']] = p
+    C_maxs = gubs.get_cmax_reachable(
+        s0, V_risk, V_i, P_risk, pi_risk, goal, A, C, lamb, k_g, succ_states)
+    c_max_values = [x for x in C_maxs.values()]
+    max_c = max(c_max_values)
+    mean_c = np.mean(c_max_values)
+    # C_maxs = {k: max_c for k in C_maxs}
+    # print("C_maxs:", C_maxs)
+
+    # "unexpand" all states in mdp_obj
+    #for s in mdp_obj:
+    #    mdp_obj[s]['expanded'] = False
+
+    solved = bool(C_maxs[s0] == 0)
+    #if solved:
+    #    mdp_obj[s0]['solved'] = True
+    value = V_risk[V_i[s0]] if solved else 1
+    prob = P_risk[V_i[s0]]
+    pi = pi_risk[V_i[s0]] if solved else None
+
+    bpsg = {(s0, 0): {"Adj": []}}
+    explicit_graph = {
+        (s0, 0): {
+            "value": value,
+            "prob": prob,
+            "solved": solved,
+            "expanded": False,
+            "pi": pi,
+            "Adj": []
+        }
+    }
+
+    i = 0
+    unexpanded = get_unexpanded_states_extended(
+        goal, explicit_graph, bpsg)
+
+    n_updates = 0
+    old_n_updates = 0
+    while len(unexpanded) > 0:
+        print("i =", i)
+        #print("Unexpanded states:", unexpanded)
+
+        s = unexpanded[0]
+        print("Will expand", text_render(env, s[0]), " with cost", s[1])
+        print()
+        # input()
+        # print("Explicit graph before:", explicit_graph)
+        explicit_graph, C_maxs = expand_state_gubs_v2(
+            s, h_v, env, goal, explicit_graph, C, C_maxs, V_risk, P_risk, pi_risk, V_i, A, k_g, lamb)
+        # print("Explicit graph after:", explicit_graph)
+        # print()
+        # print("Best partial solution graph before:", bpsg)
+        # print()
+        Z = [s]
+        print("Z size =", len(Z))
+        explicit_graph, n_updates_, _ = value_iteration_gubs(
+            explicit_graph, V_i, A, Z, k_g, lamb, C)
+        old_n_updates += len(Z)
+        n_updates += n_updates_
+        # print("Explicit graph after value iteration:", explicit_graph)
+        # print()
+
+        bpsg = update_partial_solution_extended(
+            s0, C, bpsg, explicit_graph)
+        # print("Best partial solution graph after:", bpsg)
+        # print()
+        unexpanded = get_unexpanded_states_extended(
+            goal, explicit_graph, bpsg)
+
+        i += 1
+
+    return explicit_graph, bpsg, explicit_graph_dc, n_updates, n_updates_dc, old_n_updates

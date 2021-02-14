@@ -6,18 +6,18 @@ import numpy as np
 
 
 def shortest_path_from_goal(graph, V_i, s0):
-    stack = deque([s0])
+    queue = deque([s0])
     d = {s: 0 for s in graph}
     visited = set([s0])
 
-    while len(stack) > 0:
-        s = stack.pop()
+    while len(queue) > 0:
+        s = queue.popleft()
         for s_ in graph[s]:
-            if s_ not in graph:
+            if s_ not in graph or s_ in visited:
                 continue
             if s_ not in visited:
-                stack.append(s_)
-            if d[s_] == 0:
+                queue.append(s_)
+                visited.add(s_)
                 d[s_] = d[s] + 1
 
     return d

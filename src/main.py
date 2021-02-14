@@ -207,6 +207,7 @@ if args.algorithm == 'vi-dualonly' or args.algorithm == 'vi':
         pi_func = lambda s, C: pi[V_i[s], C] if C < pi.shape[1] else pi[V_i[s], -1]
         n_updates = (C_max + 1) * len(S)
         keep_cost = True
+        print('Result for initial state dc:', P_dual[V_i[obs]], V_dual[V_i[obs]])
         print('Result for initial state:', P[V_i[obs], 0], V[V_i[obs], 0])
     else:
         pi_func = lambda s: pi_dual[V_i[s]]
@@ -230,6 +231,7 @@ elif args.algorithm == 'ao':
     pi_func = lambda s, C: explicit_graph[(s, C)]['pi'] if (s, C) in explicit_graph else explicit_graph_dc[s]['pi']
     keep_cost = True
     #print('Size explicit graph dc:', len(explicit_graph_dc))
+    print('Result for initial state dc:', explicit_graph_dc[obs]['prob'], explicit_graph_dc[obs]['value'])
     print('Result for initial state:', explicit_graph[(obs, 0)]['prob'], explicit_graph[(obs, 0)]['value'], explicit_graph[(obs, 0)]['value'] + args.k_g * explicit_graph[(obs, 0)]['prob'])
 final_time = time.time() - start
 

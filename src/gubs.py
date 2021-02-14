@@ -224,9 +224,11 @@ def W(s, a, V_diff, V_i, P, k_g, lamb, succ_states):
     if denominator == 0:
         W = 0
     else:
-        W = -(1 / lamb) * np.log(
-            V_diff / denominator
-        )
+            W = -(1 / lamb) * np.log(
+                V_diff / denominator
+            )
+        except FloatingPointError:
+            pass
         if not np.isnan(W):
             W = max(0, np.ceil(W).astype(int))
         else:

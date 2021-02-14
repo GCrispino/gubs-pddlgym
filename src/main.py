@@ -12,6 +12,7 @@ from datetime import datetime
 from pddlgym.inference import check_goal
 import mdp
 import gubs
+import heuristics
 import utils
 
 matplotlib.use('TkAgg')
@@ -126,8 +127,8 @@ def run_episode(pi,
     cum_reward = 0
     for i in range(1, n_steps + 1):
         old_obs = obs
-        obs, reward, done, _ = env.step(
-            pi(obs) if not keep_cost else pi(obs, i - 1))
+        a = pi(obs) if not keep_cost else pi(obs, i - 1)
+        obs, reward, done, _ = env.step(a)
         cum_reward += reward
         if print_history:
             state_text_render = utils.text_render(env, old_obs)
@@ -158,8 +159,17 @@ goal = problem.goal
 prob_objects = frozenset(problem.objects)
 
 obs, _ = env.reset()
+h_v = heuristics.build_hv(env, args.lamb)
+h_p = heuristics.build_hp(env)
+
 A = np.array(
     list(sorted(env.action_space.all_ground_literals(obs, valid_only=False))))
+bpsg = None
+explicit_graph = None
+explicit_graph_dc = None
+n_updates = None
+n_updates_dc = None
+keep_cost = False
 
 print('obtaining optimal policy')
 start = time.time()
@@ -181,52 +191,59 @@ if args.algorithm == 'vi-dualonly' or args.algorithm == 'vi':
     V_dual, P_dual, pi_dual, i_dual = gubs.dual_criterion(args.lamb,
                                                           V_i,
                                                           S,
+                                                          h_v,
                                                           goal,
                                                           succ_states,
                                                           A,
                                                           epsilon=args.epsilon)
 
+    n_updates_dc = i_dual * len(S)
     if args.algorithm == 'vi':
         C_max = gubs.get_cmax(V_dual, V_i, P_dual, S, succ_states, A,
                               args.lamb, args.k_g)
+        print("C_max:", C_max)
         V, P, pi = gubs.egubs_vi(V_dual, P_dual, pi_dual, C_max, args.lamb,
                                  args.k_g, V_i, S, goal, succ_states, A)
-        pi_func = lambda s, C: pi[V_i[s], C] if C < pi.shape[1] else pi[V_i[s],
-                                                                        -1]
+        pi_func = lambda s, C: pi[V_i[s], C] if C < pi.shape[1] else pi[V_i[s], -1]
+        n_updates = (C_max + 1) * len(S)
+        keep_cost = True
+        print('Result for initial state:', P[V_i[obs], 0], V[V_i[obs], 0])
     else:
         pi_func = lambda s: pi_dual[V_i[s]]
-        n_updates = i_dual * len(S)
-        #print(obs, V_dual[V_i[obs]], P_dual[V_i[obs]], pi_dual[V_i[obs]])
+        n_updates = n_updates_dc
+        print('Result for initial state:', P_dual[V_i[obs]], V_dual[V_i[obs]])
+        #print('V dual:', V_dual.reshape(4, 4))
+        #print('V dual:', P_dual.reshape(4, 4))
+        #print("V_i:", {utils.get_values(s.literals, 'robot-at')[0][1].split(':')[0]: i for s, i in V_i.items()})
 elif args.algorithm == 'ao-dualonly':
     explicit_graph, bpsg, n_updates = mdp.lao_dual_criterion(
-        obs, h_1, h_1, goal, A, args.lamb, env, args.epsilon)
+        obs, h_v, h_p, goal, A, args.lamb, env, args.epsilon)
 
     pi_func = lambda s: explicit_graph[s]['pi']
     #print(obs, explicit_graph[obs]['value'], explicit_graph[obs]['prob'], explicit_graph[obs]['pi'])
+    print('Result for initial state:', explicit_graph[obs]['prob'], explicit_graph[obs]['value'])
 elif args.algorithm == 'ao':
     explicit_graph, bpsg, explicit_graph_dc, n_updates, n_updates_dc, _ = mdp.egubs_ao(
-        obs, h_1, h_1, goal, A, args.k_g, args.lamb, env, args.epsilon)
+        obs, h_v, h_p, goal, A, args.k_g, args.lamb, env, args.epsilon)
 
     solved_states = [s for s, v in explicit_graph_dc.items() if v['solved']]
-    #print('Solved states:')
-    #for s in solved_states:
-    #    render = utils.text_render(env, s)
-    #    print(' ', render if render else s)
-    #print('Solved states:', len(solved_states))
+    pi_func = lambda s, C: explicit_graph[(s, C)]['pi'] if (s, C) in explicit_graph else explicit_graph_dc[s]['pi']
+    keep_cost = True
     #print('Size explicit graph dc:', len(explicit_graph_dc))
+    print('Result for initial state:', explicit_graph[(obs, 0)]['prob'], explicit_graph[(obs, 0)]['value'], explicit_graph[(obs, 0)]['value'] + args.k_g * explicit_graph[(obs, 0)]['prob'])
 final_time = time.time() - start
 
+if n_updates_dc:
+    print("Final updates dc:", n_updates_dc)
 print("Final updates:", n_updates)
-res = {(utils.get_coord_from_state(k[0]), k[1]): [
-    explicit_graph[k]['value'] if k in explicit_graph else None,
-    explicit_graph[k]['prob'] if k in explicit_graph else None,
-    explicit_graph[k]['value'] +
-    args.k_g * explicit_graph[k]['prob'] if k in explicit_graph else None,
-    explicit_graph[k]['pi'] if k in explicit_graph else None
-]
-       for k in bpsg}
-
-print('res: ', res)
+#if bpsg:
+#    res = {(utils.get_coord_from_state(k[0]), k[1]): [ explicit_graph[k]['value'] if k in explicit_graph else None, explicit_graph[k]['prob'] if k in explicit_graph else None, explicit_graph[k]['value'] +
+#        args.k_g * explicit_graph[k]['prob'] if k in explicit_graph else None,
+#        explicit_graph[k]['pi'] if k in explicit_graph else None
+#    ]
+#           for k in bpsg}
+#
+#    print('res: ', res)
 
 n_episodes = 500
 
@@ -289,13 +306,14 @@ if args.simulate:
                           n_steps=50,
                           output_dir=output_dir,
                           print_history=args.print_sim_history,
-                          keep_cost=False)
-
-for k, v in explicit_graph.items():
-    if 'parents' in v:
-        explicit_graph[k]['parents'] = list(explicit_graph[k]['parents'])
-explicit_graph_new_keys = {(str(k) if type(k) == tuple else k): v
-                           for k, v in explicit_graph.items()}
+                          keep_cost=keep_cost)
+explicit_graph_new_keys = None
+if explicit_graph:
+    for k, v in explicit_graph.items():
+        if 'parents' in v:
+            explicit_graph[k]['parents'] = list(explicit_graph[k]['parents'])
+    explicit_graph_new_keys = {(str((k[0].literals, k[1])) if type(k) == tuple else str(k.literals)): v
+                               for k, v in explicit_graph.items()}
 
 if args.render_and_save:
     output_filename = str(datetime.time(datetime.now())) + '.json'
@@ -306,6 +324,6 @@ if args.render_and_save:
             'n_updates_dc': n_updates_dc,
             'explicit_graph': explicit_graph_new_keys,
             'explicit_graph_dc': explicit_graph_dc
-        })
+        }, output_dir=output_dir)
     if output_file_path:
         print("Algorithm result written to ", output_file_path)

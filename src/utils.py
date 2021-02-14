@@ -127,7 +127,8 @@ def text_render(env, obs):
         return ""
     return text_render_env_functions[env.spec.id](obs)
 # ===========================================================================
-def output(output_filename, data, output_dir="./output"):
+def output(output_filename, data, output_dir=None):
+    output_dir = output_dir or "./output"
     if not os.path.isdir(output_dir):
         os.makedirs(output_dir)
 

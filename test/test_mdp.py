@@ -651,7 +651,7 @@ for s in reach_gridworld:
         succ_states_gridworld[s, a] = reach_gridworld[s][a]
 
 V_risk_gridworld, P_risk_gridworld, pi_risk_gridworld, _ = gubs.dual_criterion(
-    lamb, V_i_gridworld, S_gridworld, goal_test_domain_gridworld, succ_states_gridworld, A_gridworld)
+    lamb, V_i_gridworld, S_gridworld, h_1, goal_test_domain_gridworld, succ_states_gridworld, A_gridworld)
 C_maxs = gubs.get_cmax_reachable(init_gridworld, V_risk_gridworld, V_i_gridworld, P_risk_gridworld, pi_risk_gridworld, goal_test_domain_gridworld, A_gridworld, C_test_domain_gridworld, lamb, k_g, succ_states_gridworld)
 
 class TestMDPGraph(unittest.TestCase):

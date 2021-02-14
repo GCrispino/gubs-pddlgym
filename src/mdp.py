@@ -108,9 +108,10 @@ def expand_state_dual_criterion(s, h_v, h_p, env, explicit_graph, goal, A):
 
     for n in unexpanded_neighbours:
         if n['state'] != s:
+            is_goal = check_goal(n['state'], goal)
             new_explicit_graph[n['state']] = {
-                "value": h_v(n),
-                "prob": h_p(n),
+                "value": 1 if is_goal else h_v(n['state']),
+                "prob": 1 if is_goal else h_p(n['state']),
                 "solved": False,
                 "pi": None,
                 "expanded": False,
@@ -685,10 +686,16 @@ def lao_dual_criterion(s0,
         while len(unexpanded) > 0:
             s = unexpanded[0]
             print("Iteration", i)
-            print("Will expand", text_render(env, s))
-            explicit_graph = expand_state_dual_criterion(
-                s, h_v, h_p, env, explicit_graph, goal, A)
-            Z = [s] + find_ancestors(s, explicit_graph, best=True)
+            #print("Will expand", text_render(env, s))
+            unexpanded = unexpanded
+            print("Will expand", len(unexpanded), "states")
+            Z = set()
+            for s in unexpanded:
+                explicit_graph = expand_state_dual_criterion(
+                    s, h_v, h_p, env, explicit_graph, goal, A)
+                Z.add(s)
+                Z.update(find_ancestors(s, explicit_graph, best=True))
+            #Z = [s] + find_ancestors(s, explicit_graph, best=True)
             assert len(explicit_graph) >= explicit_graph_cur_size
             explicit_graph_cur_size = len(explicit_graph)
             print("explicit graph size:", explicit_graph_cur_size)
@@ -735,7 +742,7 @@ def lao_dual_criterion_reachable(s0, h_v, h_p, goal, A, lamb, env, epsilon=1e-3)
         explicit_graph, _, n_updates = lao_dual_criterion(
             s, h_v, h_p, goal, A, lamb, env, epsilon=epsilon, explicit_graph=explicit_graph)
         n_updates_total += n_updates
-        print(' finished lao dual criterion for', s, len(
+        print(' finished lao dual criterion for', s, explicit_graph[s]['prob'], explicit_graph[s]['value'], len(
             [v for v in explicit_graph.values() if v['solved']]))
         for s_ in explicit_graph:
             if s_ not in all_reachable:

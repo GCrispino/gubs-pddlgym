@@ -32,9 +32,8 @@ def tireworld_shortest_path(env):
         dest   = road_p.variables[1]
 
         if dest not in graph:
-            #graph[origin] = {'Adj': []}
             graph[dest] = set()
-        #graph[origin]['Adj'].append({'state': dest})
+
         graph[dest].add(origin)
     V_i = {s: i for i, s in enumerate(graph)}
     goal_location = problem.goal.literals[0].variables[0]
@@ -128,7 +127,12 @@ def tireworld_h_v(env, obs, lamb, shortest_path):
     if has_flattire and location not in spares:
         return 0
     else:
-        return np.exp(lamb * shortest_path[location])
+        graph = tireworld_h_p_data(env)
+        p = tireworld_h_p(env, obs, graph)
+        sp = shortest_path[location]
+        c = sp + (sp * (1 - p))
+
+        return np.exp(lamb * c)
 
 def river_h_v(env, obs, lamb, data):
     shortest_path, ny = data

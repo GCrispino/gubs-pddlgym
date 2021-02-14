@@ -13,7 +13,7 @@ def dual_criterion(lamb, V_i, S, h_v, goal, succ_states, A, c=1, epsilon=1e-3, n
 
     # initialize
     V = np.zeros(n_states, dtype=float)
-    for s in S:
+    for s in not_goal:
         V[V_i[s]] = h_v(s)
     pi = np.full(n_states, None)
     P = np.zeros(n_states, dtype=float)
@@ -224,6 +224,8 @@ def W(s, a, V_diff, V_i, P, k_g, lamb, succ_states):
     if denominator == 0:
         W = 0
     else:
+        W = np.nan
+        try:
             W = -(1 / lamb) * np.log(
                 V_diff / denominator
             )

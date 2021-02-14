@@ -4,7 +4,7 @@ import utils
 import numpy as np
 from pddlgym.inference import check_goal
 
-def dual_criterion(lamb, V_i, S, goal, succ_states, A, c=1, epsilon=1e-3, n_iter=None):
+def dual_criterion(lamb, V_i, S, h_v, goal, succ_states, A, c=1, epsilon=1e-3, n_iter=None):
     def u(c): return np.exp(lamb * c)
 
     G_i = [V_i[s] for s in V_i if check_goal(s, goal)]
@@ -13,6 +13,8 @@ def dual_criterion(lamb, V_i, S, goal, succ_states, A, c=1, epsilon=1e-3, n_iter
 
     # initialize
     V = np.zeros(n_states, dtype=float)
+    for s in S:
+        V[V_i[s]] = h_v(s)
     pi = np.full(n_states, None)
     P = np.zeros(n_states, dtype=float)
     V[G_i] = -np.sign(lamb)
@@ -166,7 +168,11 @@ def egubs_vi(V_dual, P_dual, pi_dual, C_max, lamb, k_g, V_i, S, goal, succ_state
     P = np.zeros((n_states, C_max + 2))
     pi = np.full((n_states, C_max + 2), None)
 
-    V_dual_C[G_i, :] = V_dual[G_i]
+    #print(C_max, len(G_i), V_dual_C.shape)
+    for i in range(V_dual_C.shape[1]):
+        V_dual_C[G_i, i] = V_dual[G_i]
+
+    #V_dual_C[G_i, :] = V_dual[G_i]
     P[G_i, :] = 1
     V_dual_C[:, C_max + 1] = V_dual.T
     P[:, C_max + 1] = P_dual.T

@@ -758,7 +758,7 @@ def value_iteration_gubs(explicit_graph, V_i, A, Z, k_g, lamb, C, env):
     n_actions = len(A)
     changed = False
     stack = copy(Z)
-    z_graph = {stack[0]: {'Adj': []}}
+    z_graph = {s: {'Adj': []} for s in stack}
 
     i = 0
     while len(stack) > 0:
@@ -913,13 +913,21 @@ def egubs_ao(s0, h_v, h_p, goal, A, k_g, lamb, env, epsilon=1e-3):
         print()
         # input()
         # print("Explicit graph before:", explicit_graph)
-        explicit_graph, C_maxs = expand_state_gubs_v2(
+        #for s in unexpanded:
+        #explicit_graph, C_maxs = expand_state_gubs_v2(
+        #    s, h_v, env, goal, explicit_graph, C, C_maxs, V_risk, P_risk, pi_risk, V_i, A, k_g, lamb)
+        for s in unexpanded:
+            explicit_graph, C_maxs = expand_state_gubs_v2(
             s, h_v, env, goal, explicit_graph, C, C_maxs, V_risk, P_risk, pi_risk, V_i, A, k_g, lamb)
         # print("Explicit graph after:", explicit_graph)
         # print()
         # print("Best partial solution graph before:", bpsg)
         # print()
-        Z = [s]
+        #Z = [s]
+        sorted_bpsg = list(reversed(topological_sort(bpsg)))
+        unexpanded_set = set(unexpanded)
+        Z = list(set([s for s in sorted_bpsg if s in unexpanded_set]))
+
         print("Z size =", len(Z))
         explicit_graph, n_updates_, _ = value_iteration_gubs(
             explicit_graph, V_i, A, Z, k_g, lamb, C, env)

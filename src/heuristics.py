@@ -146,12 +146,10 @@ def river_h_v(env, obs, lamb, data):
 
     sp = shortest_path[location]
     if location not in river_locs:
-        print('eita', location, sp, np.exp(lamb * sp))
         return np.exp(lamb * sp)
-    return np.exp(lamb * sp)
+    #return np.exp(lamb * sp)
     p = river_h_p(env, obs, data)
     c = sp + (sp * (1 - p))
-    print('eita', location, sp, p, c, np.exp(lamb * c))
     return np.exp(lamb * c)
 
 def river_get_ny(env):

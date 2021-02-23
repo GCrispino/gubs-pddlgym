@@ -686,8 +686,6 @@ def lao_dual_criterion(s0,
         while len(unexpanded) > 0:
             s = unexpanded[0]
             print("Iteration", i)
-            #print("Will expand", text_render(env, s))
-            unexpanded = unexpanded
             print("Will expand", len(unexpanded), "states")
             Z = set()
             for s in unexpanded:
@@ -708,6 +706,7 @@ def lao_dual_criterion(s0,
             unexpanded = get_unexpanded_states(goal, explicit_graph, bpsg)
             i += 1
         bpsg_states = [s_ for s_ in bpsg.keys() if not check_goal(s_, goal)]
+        print(f"Will start convergence test for bpsg with {len(bpsg)} states")
         explicit_graph, converged, n_updates_ = value_iteration_dual_criterion(
             explicit_graph,
             bpsg,

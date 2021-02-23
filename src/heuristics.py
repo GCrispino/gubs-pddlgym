@@ -130,9 +130,8 @@ def tireworld_h_v(env, obs, lamb, shortest_path):
         graph = tireworld_h_p_data(env)
         p = tireworld_h_p(env, obs, graph)
         sp = shortest_path[location]
-        c = sp + (sp * (1 - p))
 
-        return np.exp(lamb * c)
+        return np.exp(lamb * sp)
 
 def river_h_v(env, obs, lamb, data):
     shortest_path, ny = data
@@ -145,12 +144,7 @@ def river_h_v(env, obs, lamb, data):
         return 0
 
     sp = shortest_path[location]
-    if location not in river_locs:
-        return np.exp(lamb * sp)
-    #return np.exp(lamb * sp)
-    p = river_h_p(env, obs, data)
-    c = sp + (sp * (1 - p))
-    return np.exp(lamb * c)
+    return np.exp(lamb * sp)
 
 def river_get_ny(env):
     problem = env.problems[env._problem_idx]

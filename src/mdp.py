@@ -945,4 +945,4 @@ def egubs_ao(s0, h_v, h_p, goal, A, k_g, lamb, env, epsilon=1e-3):
 
         i += 1
 
-    return explicit_graph, bpsg, explicit_graph_dc, n_updates, n_updates_dc, old_n_updates
+    return explicit_graph, bpsg, explicit_graph_dc, C_maxs, n_updates, n_updates_dc, old_n_updates

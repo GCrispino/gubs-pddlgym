@@ -169,6 +169,7 @@ explicit_graph = None
 explicit_graph_dc = None
 n_updates = None
 n_updates_dc = None
+C_max = None
 keep_cost = False
 
 print('obtaining optimal policy')
@@ -224,9 +225,11 @@ elif args.algorithm == 'ao-dualonly':
     #print(obs, explicit_graph[obs]['value'], explicit_graph[obs]['prob'], explicit_graph[obs]['pi'])
     print('Result for initial state:', explicit_graph[obs]['prob'], explicit_graph[obs]['value'])
 elif args.algorithm == 'ao':
-    explicit_graph, bpsg, explicit_graph_dc, n_updates, n_updates_dc, _ = mdp.egubs_ao(
+    explicit_graph, bpsg, explicit_graph_dc, C_maxs, n_updates, n_updates_dc, _ = mdp.egubs_ao(
         obs, h_v, h_p, goal, A, args.k_g, args.lamb, env, args.epsilon)
 
+    C_max = int(C_maxs[obs])
+    print("C_max:", C_max)
     solved_states = [s for s, v in explicit_graph_dc.items() if v['solved']]
     pi_func = lambda s, C: explicit_graph[(s, C)]['pi'] if (s, C) in explicit_graph else explicit_graph_dc[s]['pi']
     keep_cost = True
@@ -326,6 +329,7 @@ if args.render_and_save:
             'n_updates_dc': n_updates_dc,
             'explicit_graph': explicit_graph_new_keys,
             'explicit_graph_dc': explicit_graph_dc
+            'C_max': C_max
         }, output_dir=output_dir)
     if output_file_path:
         print("Algorithm result written to ", output_file_path)

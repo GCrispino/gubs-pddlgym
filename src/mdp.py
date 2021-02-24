@@ -1,4 +1,5 @@
 from copy import copy
+from collections import deque
 import gubs
 from utils import text_render, flatten
 import numpy as np
@@ -404,6 +405,29 @@ def dfs(mdp, on_visit=None, on_visit_neighbor=None, on_finish=None):
             dfs_visit(i, colors, d, f, low, time, S, V_i, mdp, on_visit, on_visit_neighbor, on_finish)
 
     return d, f, colors
+
+def get_sccs(mdp):
+    stack = deque()
+    sccs = []
+    def on_visit(s, d, low):
+        stack.append(s)
+    def on_visit_neighbor(s, s_, d, low):
+        if s in stack:
+            low[s] = min(low[s], d[s_])
+    def on_finish(s, d, low):
+        new_scc = deque()
+        if d[s] == low[s]:
+            while True:
+                n = stack.pop()
+                new_scc.append(n)
+                if s == n:
+                    break
+        # print('new scc', new_scc)
+        if len(new_scc) > 0:
+            sccs.append(set(sorted(new_scc)))
+    dfs(mdp, on_visit, on_visit_neighbor, on_finish)
+
+    return sccs
 
 def topological_sort(mdp):
     stack = []

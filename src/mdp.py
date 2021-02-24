@@ -351,15 +351,23 @@ def find_unreachable(s0, mdp):
     V_i = {S[i]: i for i in range(len_s)}
     colors = ['w'] * len_s
     dfs_visit(V_i[s0], colors, [-1] * len_s,
-              [-1] * len_s, [0], S, V_i, mdp)
+              [-1] * len_s, [-1] * len_s, [0], S, V_i, mdp)
     return [S[i] for i, c in enumerate(colors) if c != 'b']
 
 
-def dfs_visit(i, colors, d, f, time, S, V_i, mdp, fn=None):
+# TODO
+# Adicionar testes
+#   DFS
+#   SCCs
+def dfs_visit(i, colors, d, f, low, time, S, V_i, mdp, on_visit=None, on_visit_neighbor=None, on_finish=None):
     colors[i] = 'g'
     time[0] += 1
     d[i] = time[0]
+    low[i] = time[0]
     s = S[i]
+
+    if on_visit:
+        on_visit(s, d, low)
 
     for s_obj in mdp[s]['Adj']:
         s_ = s_obj['state']
@@ -367,17 +375,20 @@ def dfs_visit(i, colors, d, f, time, S, V_i, mdp, fn=None):
             continue
         j = V_i[s_]
         if colors[j] == 'w':
-            dfs_visit(j, colors, d, f, time, S, V_i, mdp, fn)
+            dfs_visit(j, colors, d, f, low, time, S, V_i, mdp, on_visit, on_finish)
+            low[i] = min(low[i], low[j])
+        if on_visit_neighbor:
+            on_visit_neighbor(s, s_, d, low)
 
-    if fn:
-        fn(s)
+    if on_finish:
+        on_finish(s, d, low)
 
     colors[i] = 'b'
     time[0] += 1
     f[i] = time[0]
 
 
-def dfs(mdp, fn=None):
+def dfs(mdp, on_visit=None, on_visit_neighbor=None, on_finish=None):
     S = list(mdp.keys())
     len_s = len(S)
     V_i = {S[i]: i for i in range(len_s)}
@@ -385,11 +396,12 @@ def dfs(mdp, fn=None):
     colors = ['w'] * len_s
     d = [-1] * len_s
     f = [-1] * len_s
+    low = [-1] * len_s
     time = [0]
     for i in range(len_s):
         c = colors[i]
         if c == 'w':
-            dfs_visit(i, colors, d, f, time, S, V_i, mdp, fn)
+            dfs_visit(i, colors, d, f, low, time, S, V_i, mdp, on_visit, on_visit_neighbor, on_finish)
 
     return d, f, colors
 
@@ -398,7 +410,7 @@ def topological_sort(mdp):
 
     def dfs_fn(s):
         stack.append(s)
-    dfs(mdp, dfs_fn)
+    dfs(mdp, on_finish=dfs_fn)
     return list(reversed(stack))
 
 def update_action_partial_solution(s, s0, a, bpsg, explicit_graph):
@@ -856,8 +868,6 @@ def egubs_ao(s0, h_v, h_p, goal, A, k_g, lamb, env, epsilon=1e-3):
 
     def C(s, a): return 0 if check_goal(s, goal) else 1
 
-    # Criar succ_states a partir do explicit_graph_dc
-    # TODO -> Imprimir esse cara pra uma instância do rio e ver se ta certo
     succ_states = {}
     for s_ in explicit_graph_dc:
         for s__ in explicit_graph_dc[s_]['Adj']:

@@ -626,6 +626,18 @@ explicit_graph_river_test = {
     },
 }
 
+graph_ex = {
+    'u': {'Adj': [
+        {'state': 'v'},
+        {'state': 'x'},
+    ]},
+    'v': {'Adj': [{'state': 'y'}]},
+    'w': {'Adj': [{'state': 'y'}, {'state': 'z'}]},
+    'x': {'Adj': [{'state': 'v'}]},
+    'y': {'Adj': [{'state': 'x'}]},
+    'z': {'Adj': [{'state': 'z'}]},
+}
+
 
 def C_factory(goal):
     def C(s, a):
@@ -1043,3 +1055,35 @@ class TestMDPGraph(unittest.TestCase):
             (s2_gridworld, 1), bpsg_3_extended, C_test_domain_gridworld)
         ancestors = set(ancestors_)
         self.assertSetEqual(ancestors, set([(s1_gridworld, 0)]))
+
+
+    def test_dfs(self):
+        d, f, colors = mdp.dfs(graph)
+
+        self.assertListEqual(colors, ['b'] * len(graph))
+        self.assertListEqual(d, [1, 2, 3])
+        self.assertListEqual(f, [6, 5, 4])
+
+    def test_dfs_2(self):
+        # No need to define the 'A' dict for each state
+        #   because it is only a graph to test dfs,
+        #   not mdp functinoality
+
+        trace = []
+        d, f, colors = mdp.dfs(graph_ex, on_finish=lambda s, *_: trace.append(s))
+
+        self.assertListEqual(colors, ['b', 'b', 'b', 'b', 'b', 'b'])
+        self.assertListEqual(d, [1, 2, 9, 4, 3, 10])
+        self.assertListEqual(f, [8, 7, 12, 5, 6, 11])
+        self.assertListEqual(trace, ['x', 'y', 'v', 'u', 'z', 'w'])
+
+    def test_topological_sort(self):
+        topsort = mdp.topological_sort(graph)
+
+        self.assertListEqual(topsort, [s1_gridworld, s2_gridworld, s3_gridworld])
+
+    def test_topological_sort_2(self):
+
+        topsort = mdp.topological_sort(graph_ex)
+
+        self.assertListEqual(topsort, ['w', 'z', 'u', 'v', 'y', 'x'])

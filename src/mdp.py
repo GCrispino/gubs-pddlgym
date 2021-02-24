@@ -432,7 +432,7 @@ def get_sccs(mdp):
 def topological_sort(mdp):
     stack = []
 
-    def dfs_fn(s):
+    def dfs_fn(s, *_):
         stack.append(s)
     dfs(mdp, on_finish=dfs_fn)
     return list(reversed(stack))

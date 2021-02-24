@@ -376,7 +376,7 @@ def dfs_visit(i, colors, d, f, low, time, S, V_i, mdp, on_visit=None, on_visit_n
             continue
         j = V_i[s_]
         if colors[j] == 'w':
-            dfs_visit(j, colors, d, f, low, time, S, V_i, mdp, on_visit, on_finish)
+            dfs_visit(j, colors, d, f, low, time, S, V_i, mdp, on_visit, on_visit_neighbor, on_finish)
             low[i] = min(low[i], low[j])
         if on_visit_neighbor:
             on_visit_neighbor(s, s_, d, low)

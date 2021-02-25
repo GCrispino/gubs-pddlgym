@@ -1087,3 +1087,53 @@ class TestMDPGraph(unittest.TestCase):
         topsort = mdp.topological_sort(graph_ex)
 
         self.assertListEqual(topsort, ['w', 'z', 'u', 'v', 'y', 'x'])
+
+    def test_sccs(self):
+        expected_sccs = set({
+            frozenset({'u'}),
+            frozenset({'v', 'x', 'y'}),
+            frozenset({'w'}),
+            frozenset({'z'})
+        })
+        print('graph_ex', graph_ex)
+        sccs = mdp.get_sccs(graph_ex)
+
+        self.assertSetEqual(sccs, expected_sccs)
+
+    def test_sccs_test_domain(self):
+        expected_sccs = set({
+            frozenset({s1}),
+            frozenset({s2}),
+            frozenset({s3}),
+            frozenset({de})
+        })
+        sccs = mdp.get_sccs(explicit_graph_test_dual_criterion_3)
+
+        self.assertSetEqual(sccs, expected_sccs)
+
+    def test_sccs_test_domain_2(self):
+        de1 = de
+        de2 = 'de2' # string just to represent new state
+        graph_ = deepcopy(explicit_graph_test_dual_criterion_3)
+        graph_[de1]['Adj'] = [{
+            "state": de2,
+            "A": { move1_operator_pred(): 1 }
+        }]
+        graph_[de2] = {
+            "Adj": [{
+                "state": de1,
+                "A": {
+                    move1_operator_pred(): 1
+                }
+            }]
+        }
+
+        expected_sccs = set({
+            frozenset({s1}),
+            frozenset({s2}),
+            frozenset({s3}),
+            frozenset({de1, de2})
+        })
+        sccs = mdp.get_sccs(graph_)
+
+        self.assertSetEqual(sccs, expected_sccs)

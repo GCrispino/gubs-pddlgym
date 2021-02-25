@@ -358,7 +358,6 @@ def find_unreachable(s0, mdp):
 
 # TODO
 # Adicionar testes
-#   DFS
 #   SCCs
 def dfs_visit(i, colors, d, f, low, time, S, V_i, mdp, on_visit=None, on_visit_neighbor=None, on_finish=None):
     colors[i] = 'g'
@@ -368,7 +367,7 @@ def dfs_visit(i, colors, d, f, low, time, S, V_i, mdp, on_visit=None, on_visit_n
     s = S[i]
 
     if on_visit:
-        on_visit(s, d, low)
+        on_visit(s, i, d, low)
 
     for s_obj in mdp[s]['Adj']:
         s_ = s_obj['state']
@@ -379,10 +378,10 @@ def dfs_visit(i, colors, d, f, low, time, S, V_i, mdp, on_visit=None, on_visit_n
             dfs_visit(j, colors, d, f, low, time, S, V_i, mdp, on_visit, on_visit_neighbor, on_finish)
             low[i] = min(low[i], low[j])
         if on_visit_neighbor:
-            on_visit_neighbor(s, s_, d, low)
+            on_visit_neighbor(s, i, s_, j, d, low)
 
     if on_finish:
-        on_finish(s, d, low)
+        on_finish(s, i, d, low)
 
     colors[i] = 'b'
     time[0] += 1
@@ -408,23 +407,22 @@ def dfs(mdp, on_visit=None, on_visit_neighbor=None, on_finish=None):
 
 def get_sccs(mdp):
     stack = deque()
-    sccs = []
-    def on_visit(s, d, low):
+    sccs = set()
+    def on_visit(s, i, d, low):
         stack.append(s)
-    def on_visit_neighbor(s, s_, d, low):
-        if s in stack:
-            low[s] = min(low[s], d[s_])
-    def on_finish(s, d, low):
+    def on_visit_neighbor(s, i, s_, j, d, low):
+        if s_ in stack:
+            low[i] = min(low[i], d[j])
+    def on_finish(s, i, d, low):
         new_scc = deque()
-        if d[s] == low[s]:
+        if d[i] == low[i]:
             while True:
                 n = stack.pop()
                 new_scc.append(n)
                 if s == n:
                     break
-        # print('new scc', new_scc)
         if len(new_scc) > 0:
-            sccs.append(set(sorted(new_scc)))
+            sccs.add(frozenset(sorted(new_scc)))
     dfs(mdp, on_visit, on_visit_neighbor, on_finish)
 
     return sccs

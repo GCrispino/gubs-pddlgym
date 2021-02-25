@@ -422,7 +422,7 @@ def get_sccs(mdp):
                 if s == n:
                     break
         if len(new_scc) > 0:
-            sccs.add(frozenset(sorted(new_scc)))
+            sccs.add(frozenset(new_scc))
     dfs(mdp, on_visit, on_visit_neighbor, on_finish)
 
     return sccs

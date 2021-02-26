@@ -328,7 +328,7 @@ if args.render_and_save:
             'n_updates': n_updates,
             'n_updates_dc': n_updates_dc,
             'explicit_graph': explicit_graph_new_keys,
-            'explicit_graph_dc': explicit_graph_dc
+            'explicit_graph_dc': explicit_graph_dc,
             'C_max': C_max
         }, output_dir=output_dir)
     if output_file_path:

@@ -24,6 +24,7 @@ DEFAULT_EPSILON = 0.1
 DEFAULT_LAMBDA = -0.1
 DEFAULT_KG = 1
 DEFAULT_ALGORITHM = 'vi'
+DEFAULT_NOT_P_ZERO = False
 DEFAULT_SIMULATE = False
 DEFAULT_RENDER_AND_SAVE = False
 DEFAULT_PRINT_SIM_HISTORY = False
@@ -69,6 +70,14 @@ def parse_args():
                         default=DEFAULT_ALGORITHM,
                         help="Algorithm to run (default: %s)" %
                         DEFAULT_ALGORITHM)
+    parser.add_argument(
+        '--not_p_zero',
+        dest='not_p_zero',
+        default=DEFAULT_NOT_P_ZERO,
+        action="store_true",
+        help=
+        "Defines whether or not to not set probability values to zero in dual criterion value iteration (default: %s)"
+        % DEFAULT_NOT_P_ZERO)
     parser.add_argument(
         '--simulate',
         dest='simulate',
@@ -219,7 +228,7 @@ if args.algorithm == 'vi-dualonly' or args.algorithm == 'vi':
         #print("V_i:", {utils.get_values(s.literals, 'robot-at')[0][1].split(':')[0]: i for s, i in V_i.items()})
 elif args.algorithm == 'ao-dualonly':
     explicit_graph, bpsg, n_updates = mdp.lao_dual_criterion(
-        obs, h_v, h_p, goal, A, args.lamb, env, args.epsilon)
+        obs, h_v, h_p, goal, A, args.lamb, env, args.epsilon, not args.not_p_zero)
 
     pi_func = lambda s: explicit_graph[s]['pi']
     #print(obs, explicit_graph[obs]['value'], explicit_graph[obs]['prob'], explicit_graph[obs]['pi'])

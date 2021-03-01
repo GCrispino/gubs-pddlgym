@@ -1,7 +1,7 @@
 from copy import copy
 from collections import deque
 import gubs
-from utils import text_render, flatten
+import utils
 import numpy as np
 from pddlgym.core import get_successor_states, InvalidAction
 from pddlgym.inference import check_goal
@@ -79,7 +79,7 @@ def vi(S, succ_states, A, V_i, G_i, goal, env, gamma, epsilon):
     return V, pi
 
 
-def expand_state_dual_criterion(s, h_v, h_p, env, explicit_graph, goal, A):
+def expand_state_dual_criterion(s, h_v, h_p, env, explicit_graph, goal, A, p_zero=True):
     if check_goal(s, goal):
         raise ValueError(
             f'State {s} can\'t be expanded because it is a goal state')
@@ -103,7 +103,8 @@ def expand_state_dual_criterion(s, h_v, h_p, env, explicit_graph, goal, A):
     # Add new empty states to 's' adjacency list
     new_explicit_graph = copy(explicit_graph)
 
-    new_explicit_graph[s]['prob'] = 0
+    if p_zero:
+        new_explicit_graph[s]['prob'] = 0
 
     new_explicit_graph[s]["Adj"].extend(neighbour_states)
 
@@ -116,6 +117,8 @@ def expand_state_dual_criterion(s, h_v, h_p, env, explicit_graph, goal, A):
                 "solved": False,
                 "pi": None,
                 "expanded": False,
+                "Q_v": {a: 1 if is_goal else h_v(n['state']) for a in A},
+                "Q_p": {a: 1 if is_goal else h_p(n['state']) for a in A},
                 "Adj": []
             }
 
@@ -567,6 +570,57 @@ def update_partial_solution_extended(s0, C, bpsg, explicit_graph):
 
     return bpsg_
 
+def is_trap(scc, sccs, goal, explicit_graph):
+    # detect if there is an edge that goes to a state
+    #   from other components that is not a goal
+    is_trap = False
+    for s in scc:
+        if is_trap:
+            break
+        for adj in explicit_graph[s]['Adj']:
+            s_ = adj['state']
+            if s_ in scc or check_goal(s_, goal):
+                continue
+            is_trap = any([scc_ != scc and s_ in scc_ for scc_ in sccs])
+            if is_trap:
+                break
+    return is_trap
+
+def eliminate_traps(bpsg, goal, explicit_graph):
+    sccs = get_sccs(bpsg)
+
+    traps = set(filter(lambda scc: is_trap(scc, sccs, goal, explicit_graph), sccs))
+
+    for trap in traps:
+        # check if trap is transient or permanent
+        found_action = False
+        actions = set()
+        for s in trap:
+            for adj in explicit_graph[s]['Adj']:
+                s_ = adj['state']
+                if s_ not in trap:
+                    found_action = True
+                    actions.update(set(adj['A']))
+
+        print('found_action', found_action)
+        exit()
+        if not found_action:
+            # permanent
+            for s in trap:
+                explicit_graph[s]['value'] = 0
+                explicit_graph[s]['prob'] = 0
+        else:
+            # transient
+            max_utility = max([explicit_graph[s]['Q_v'][a] for s in trap for a in actions])
+            max_prob = max([explicit_graph[s]['Q_p'][a] for s in trap for a in actions])
+            for s in trap:
+                explicit_graph[s]['value'] = max_utility
+                explicit_graph[s]['prob'] = max_prob
+
+
+    return bpsg
+
+
 
 def value_iteration_dual_criterion(explicit_graph,
                                    bpsg,
@@ -576,24 +630,36 @@ def value_iteration_dual_criterion(explicit_graph,
                                    lamb,
                                    C,
                                    epsilon=1e-3,
+                                   p_zero=True,
                                    n_iter=None,
                                    convergence_test=False):
     n_states = len(explicit_graph)
+    n_actions = len(A)
 
     # initialize
     V = np.zeros(n_states, dtype=float)
+    Q_v = np.zeros((n_states, n_actions), dtype=float)
+    Q_p = np.zeros((n_states, n_actions), dtype=float)
     pi = np.full(n_states, None)
     P = np.zeros(n_states, dtype=float)
     V_i = {s: i for i, s in enumerate(explicit_graph)}
+    A_i = {a: i for i, a in enumerate(A)}
 
-    for s in Z:
-        if not check_goal(s, goal) and not explicit_graph[s]['solved'] and explicit_graph[s]['expanded']:
-            explicit_graph[s]['prob'] = 0
+    if p_zero:
+        for s in Z:
+            if not check_goal(s, goal) and not explicit_graph[s]['solved'] and explicit_graph[s]['expanded']:
+                explicit_graph[s]['prob'] = 0
+                for a in A:
+                    explicit_graph[s]['Q_p'][a] = 0
 
     for s, n in explicit_graph.items():
+        k = sorted(list(n.keys()))
         V[V_i[s]] = n['value']
         P[V_i[s]] = n['prob']
         pi[V_i[s]] = n['pi']
+        for a in A:
+            Q_v[V_i[s], A_i[a]] = n['Q_v'][a]
+            Q_p[V_i[s], A_i[a]] = n['Q_p'][a]
 
     i = 0
 
@@ -610,6 +676,8 @@ def value_iteration_dual_criterion(explicit_graph,
         for s in Z:
             if explicit_graph[s]['solved']:
                 continue
+            #if not p_zero and explicit_graph[s]['prob'] < epsilon:
+            #    continue
             n_updates += 1
             all_reachable = np.array(
                 [find_reachable(s, a, explicit_graph) for a in A], dtype=object)
@@ -618,6 +686,7 @@ def value_iteration_dual_criterion(explicit_graph,
                     P[V_i[s_['state']]] * s_['A'][a] for s_ in all_reachable[i]
                 ]) for i, a in enumerate(A)
             ])
+            Q_p[V_i[s]] = actions_results_p
 
             # set maxprob
             max_prob = np.max(actions_results_p)
@@ -635,12 +704,15 @@ def value_iteration_dual_criterion(explicit_graph,
             actions_results = np.array([
                 np.sum([
                     np.exp(lamb * C(s, A[i])) * V[V_i[s_['state']]] *
-                    s_['A'][A[i]] for s_ in all_reachable[i]
-                ]) for i in i_A_max_prob
+                    s_['A'][a] for s_ in all_reachable[i]
+                #]) for i in i_A_max_prob
+                ]) for i, a in enumerate(A)
             ])
+            actions_results_max_prob = actions_results[i_A_max_prob]
+            Q_v[V_i[s]] = actions_results
 
-            i_a = np.argmax(actions_results)
-            V_[V_i[s]] = actions_results[i_a]
+            i_a = np.argmax(actions_results_max_prob)
+            V_[V_i[s]] = actions_results_max_prob[i_a]
             pi_[V_i[s]] = A_max_prob[i_a]
 
         #print(V_i.values())
@@ -679,9 +751,97 @@ def value_iteration_dual_criterion(explicit_graph,
         explicit_graph[s]['prob'] = P[V_i[s]]
         explicit_graph[s]['pi'] = pi[V_i[s]]
 
+        for a in A:
+            explicit_graph[s]['Q_v'][a] = Q_v[V_i[s], A_i[a]]
+            explicit_graph[s]['Q_p'][a] = Q_p[V_i[s], A_i[a]]
+
     #print(f'{i} iterations')
     return explicit_graph, converged, n_updates
 
+def lao_dual_criterion_fret(s0,
+                       h_v,
+                       h_p,
+                       goal,
+                       A,
+                       lamb,
+                       env,
+                       epsilon=1e-3,
+                       explicit_graph=None):
+    bpsg = {s0: {"Adj": []}}
+    explicit_graph = explicit_graph or {}
+
+    if s0 in explicit_graph and explicit_graph[s0]['solved']:
+        return explicit_graph, bpsg, 0
+
+    if s0 not in explicit_graph:
+        explicit_graph[s0] = {
+            "value": h_v(s0),
+            "prob": h_p(s0),
+            "solved": False,
+            "expanded": False,
+            "pi": None,
+            "Q_v": {a: h_v(s0) for a in A},
+            "Q_p": {a: h_p(s0) for a in A},
+            "Adj": []
+        }
+
+    def C(s, a):
+        return 0 if check_goal(s, goal) else 1
+
+    i = 1
+    unexpanded = get_unexpanded_states(goal, explicit_graph, bpsg)
+    n_updates = 0
+    explicit_graph_cur_size = 1
+    while True:
+        while len(unexpanded) > 0:
+            s = unexpanded[0]
+            print("Iteration", i)
+            print("Will expand", len(unexpanded), "states")
+            Z = set()
+            for s in unexpanded:
+                explicit_graph = expand_state_dual_criterion(
+                    s, h_v, h_p, env, explicit_graph, goal, A, p_zero=False)
+                Z.add(s)
+                Z.update(find_ancestors(s, explicit_graph, best=True))
+
+            assert len(explicit_graph) >= explicit_graph_cur_size
+
+            explicit_graph_cur_size = len(explicit_graph)
+            print("explicit graph size:", explicit_graph_cur_size)
+            print("Z size:", len(Z))
+            explicit_graph, _, n_updates_ = value_iteration_dual_criterion(
+                explicit_graph, bpsg, A, Z, goal, lamb, C, epsilon=epsilon, p_zero=False)
+            print(f"Finished value iteration in {n_updates_} updates")
+            n_updates += n_updates_
+            bpsg = update_partial_solution(s0, bpsg, explicit_graph)
+
+            bpsg = eliminate_traps(bpsg, goal, explicit_graph)
+
+            unexpanded = get_unexpanded_states(goal, explicit_graph, bpsg)
+            i += 1
+        bpsg_states = [s_ for s_ in bpsg.keys() if not check_goal(s_, goal)]
+        print(f"Will start convergence test for bpsg with {len(bpsg)} states")
+        explicit_graph, converged, n_updates_ = value_iteration_dual_criterion(
+            explicit_graph,
+            bpsg,
+            A,
+            bpsg_states,
+            goal,
+            lamb,
+            C,
+            epsilon=epsilon,
+            convergence_test=True,
+            p_zero=False)
+        n_updates += n_updates_
+
+        bpsg = update_partial_solution(s0, bpsg, explicit_graph)
+        unexpanded = get_unexpanded_states(goal, explicit_graph, bpsg)
+
+        if converged and len(unexpanded) == 0:
+            break
+    for s_ in bpsg:
+        explicit_graph[s_]['solved'] = True
+    return explicit_graph, bpsg, n_updates
 
 def lao_dual_criterion(s0,
                        h_v,
@@ -705,6 +865,8 @@ def lao_dual_criterion(s0,
             "solved": False,
             "expanded": False,
             "pi": None,
+            "Q_v": {a: h_v(s0) for a in A},
+            "Q_p": {a: h_p(s0) for a in A},
             "Adj": []
         }
 
@@ -771,7 +933,7 @@ def lao_dual_criterion_reachable(s0, h_v, h_p, goal, A, lamb, env, epsilon=1e-3)
     n_updates_total = 0
     while len(stack) > 0:
         s = stack.pop()
-        print("Will call lao_dual_criterion for state:", text_render(env, s))
+        print("Will call lao_dual_criterion for state:", utils.text_render(env, s))
         explicit_graph, _, n_updates = lao_dual_criterion(
             s, h_v, h_p, goal, A, lamb, env, epsilon=epsilon, explicit_graph=explicit_graph)
         n_updates_total += n_updates
@@ -853,7 +1015,7 @@ def value_iteration_gubs(explicit_graph, V_i, A, Z, k_g, lamb, C, env):
             changed = True
 
         if is_solved:
-            print(f"{text_render(env, s[0])} with cost {s[1]} is now solved!")
+            print(f"{utils.text_render(env, s[0])} with cost {s[1]} is now solved!")
         explicit_graph[s]['solved'] = is_solved
 
         if explicit_graph[s]['value'] < old_val or is_solved:
@@ -940,7 +1102,7 @@ def egubs_ao(s0, h_v, h_p, goal, A, k_g, lamb, env, epsilon=1e-3):
         #print("Unexpanded states:", unexpanded)
 
         s = unexpanded[0]
-        print("Will expand", text_render(env, s[0]), " with cost", s[1])
+        print("Will expand", utils.text_render(env, s[0]), " with cost", s[1])
         print()
         # input()
         # print("Explicit graph before:", explicit_graph)

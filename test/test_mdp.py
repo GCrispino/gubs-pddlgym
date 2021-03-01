@@ -202,6 +202,14 @@ explicit_graph_test_dual_criterion = {
         "solved": False,
         "expanded": True,
         "pi": "None",
+        "Q_v": {
+            move1_operator_pred(): 1,
+            move2_operator_pred(): 1
+        },
+        "Q_p": {
+            move1_operator_pred(): 1,
+            move2_operator_pred(): 1
+        },
         "Adj": [
             {
                 "state": s2,
@@ -229,6 +237,14 @@ explicit_graph_test_dual_criterion = {
         "solved": False,
         "pi": None,
         "expanded": False,
+        "Q_v": {
+            move1_operator_pred(): 1,
+            move2_operator_pred(): 1
+        },
+        "Q_p": {
+            move1_operator_pred(): 1,
+            move2_operator_pred(): 1
+        },
         "Adj": [],
     },
     s3: {
@@ -237,6 +253,14 @@ explicit_graph_test_dual_criterion = {
         "solved": False,
         "pi": None,
         "expanded": False,
+        "Q_v": {
+            move1_operator_pred(): 1,
+            move2_operator_pred(): 1
+        },
+        "Q_p": {
+            move1_operator_pred(): 1,
+            move2_operator_pred(): 1
+        },
         "Adj": [],
     },
     de: {
@@ -245,6 +269,14 @@ explicit_graph_test_dual_criterion = {
         "solved": False,
         "pi": None,
         "expanded": False,
+        "Q_v": {
+            move1_operator_pred(): 1,
+            move2_operator_pred(): 1
+        },
+        "Q_p": {
+            move1_operator_pred(): 1,
+            move2_operator_pred(): 1
+        },
         "Adj": [],
     }
 }
@@ -296,16 +328,19 @@ bpsg_2 = {
 
 explicit_graph_test_dual_criterion_2 = {
     s1: {
-        "value":
-        np.exp(lamb),
-        "prob":
-        1,
-        "solved":
-        False,
-        "expanded":
-        True,
-        "pi":
-        move1_operator_pred(),
+        "value": np.exp(lamb),
+        "prob": 1,
+        "solved": False,
+        "expanded": True,
+        "pi": move1_operator_pred(),
+        "Q_v": {
+            move1_operator_pred(): 1,
+            move2_operator_pred(): 1
+        },
+        "Q_p": {
+            move1_operator_pred(): 1,
+            move2_operator_pred(): 1
+        },
         "Adj": [
             {
                 "state": s2,
@@ -333,6 +368,14 @@ explicit_graph_test_dual_criterion_2 = {
         "solved": False,
         "pi": None,
         "expanded": False,
+        "Q_v": {
+            move1_operator_pred(): 1,
+            move2_operator_pred(): 1
+        },
+        "Q_p": {
+            move1_operator_pred(): 1,
+            move2_operator_pred(): 1
+        },
         "Adj": [{
             "state": de,
             "A": {
@@ -346,6 +389,14 @@ explicit_graph_test_dual_criterion_2 = {
         "solved": False,
         "pi": None,
         "expanded": False,
+        "Q_v": {
+            move1_operator_pred(): 1,
+            move2_operator_pred(): 1
+        },
+        "Q_p": {
+            move1_operator_pred(): 1,
+            move2_operator_pred(): 1
+        },
         "Adj": [],
     },
     s3: {
@@ -354,22 +405,33 @@ explicit_graph_test_dual_criterion_2 = {
         "solved": False,
         "pi": None,
         "expanded": False,
+        "Q_v": {
+            move1_operator_pred(): 1,
+            move2_operator_pred(): 1
+        },
+        "Q_p": {
+            move1_operator_pred(): 1,
+            move2_operator_pred(): 1
+        },
         "Adj": [],
     }
 }
 
 explicit_graph_test_dual_criterion_3 = {
     s1: {
-        "value":
-        np.exp(lamb),
-        "prob":
-        1,
-        "solved":
-        False,
-        "expanded":
-        True,
-        "pi":
-        "a",
+        "value": np.exp(lamb),
+        "prob": 1,
+        "solved": False,
+        "expanded": True,
+        "pi": "a",
+        "Q_v": {
+            move1_operator_pred(): 1,
+            move2_operator_pred(): 1
+        },
+        "Q_p": {
+            move1_operator_pred(): 1,
+            move2_operator_pred(): 1
+        },
         "Adj": [
             {
                 "state": s2,
@@ -397,6 +459,14 @@ explicit_graph_test_dual_criterion_3 = {
         "solved": False,
         "pi": None,
         "expanded": False,
+        "Q_v": {
+            move1_operator_pred(): 1,
+            move2_operator_pred(): 1
+        },
+        "Q_p": {
+            move1_operator_pred(): 1,
+            move2_operator_pred(): 1
+        },
         "Adj": [{
             "state": de,
             "A": {
@@ -410,6 +480,14 @@ explicit_graph_test_dual_criterion_3 = {
         "solved": False,
         "pi": None,
         "expanded": True,
+        "Q_v": {
+            move1_operator_pred(): 1,
+            move2_operator_pred(): 1
+        },
+        "Q_p": {
+            move1_operator_pred(): 1,
+            move2_operator_pred(): 1
+        },
         "Adj": [{
             "state": s3,
             "A": {
@@ -423,6 +501,14 @@ explicit_graph_test_dual_criterion_3 = {
         "solved": False,
         "pi": None,
         "expanded": False,
+        "Q_v": {
+            move1_operator_pred(): 1,
+            move2_operator_pred(): 1
+        },
+        "Q_p": {
+            move1_operator_pred(): 1,
+            move2_operator_pred(): 1
+        },
         "Adj": [],
     }
 }

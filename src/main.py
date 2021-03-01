@@ -26,6 +26,7 @@ DEFAULT_KG = 1
 DEFAULT_ALGORITHM = 'vi'
 DEFAULT_SIMULATE = False
 DEFAULT_RENDER_AND_SAVE = False
+DEFAULT_ELIMINATE_TRAPS = False
 DEFAULT_PRINT_SIM_HISTORY = False
 DEFAULT_PLOT_STATS = False
 DEFAULT_OUTPUT_DIR = "./output"
@@ -69,6 +70,14 @@ def parse_args():
                         default=DEFAULT_ALGORITHM,
                         help="Algorithm to run (default: %s)" %
                         DEFAULT_ALGORITHM)
+    parser.add_argument(
+        '--eliminate_traps',
+        dest='eliminate_traps',
+        default=DEFAULT_ELIMINATE_TRAPS,
+        action="store_true",
+        help=
+        "Defines whether or not to use trap elimination as in FRET (default: %s)"
+        % DEFAULT_ELIMINATE_TRAPS)
     parser.add_argument(
         '--simulate',
         dest='simulate',
@@ -218,8 +227,12 @@ if args.algorithm == 'vi-dualonly' or args.algorithm == 'vi':
         #print('V dual:', P_dual.reshape(4, 4))
         #print("V_i:", {utils.get_values(s.literals, 'robot-at')[0][1].split(':')[0]: i for s, i in V_i.items()})
 elif args.algorithm == 'ao-dualonly':
-    explicit_graph, bpsg, n_updates = mdp.lao_dual_criterion(
-        obs, h_v, h_p, goal, A, args.lamb, env, args.epsilon)
+    if args.eliminate_traps:
+        explicit_graph, bpsg, n_updates = mdp.lao_dual_criterion_fret(
+            obs, h_v, h_p, goal, A, args.lamb, env, args.epsilon)
+    else:
+        explicit_graph, bpsg, n_updates = mdp.lao_dual_criterion(
+            obs, h_v, h_p, goal, A, args.lamb, env, args.epsilon)
 
     pi_func = lambda s: explicit_graph[s]['pi']
     #print(obs, explicit_graph[obs]['value'], explicit_graph[obs]['prob'], explicit_graph[obs]['pi'])
@@ -328,7 +341,7 @@ if args.render_and_save:
             'n_updates': n_updates,
             'n_updates_dc': n_updates_dc,
             'explicit_graph': explicit_graph_new_keys,
-            'explicit_graph_dc': explicit_graph_dc
+            'explicit_graph_dc': explicit_graph_dc,
             'C_max': C_max
         }, output_dir=output_dir)
     if output_file_path:

@@ -542,6 +542,7 @@ def value_iteration_dual_criterion(explicit_graph,
                                    lamb,
                                    C,
                                    epsilon=1e-3,
+                                   p_zero=True,
                                    n_iter=None,
                                    convergence_test=False):
     n_states = len(explicit_graph)
@@ -552,14 +553,16 @@ def value_iteration_dual_criterion(explicit_graph,
     P = np.zeros(n_states, dtype=float)
     V_i = {s: i for i, s in enumerate(explicit_graph)}
 
-    for s in Z:
-        if not check_goal(s, goal) and not explicit_graph[s]['solved'] and explicit_graph[s]['expanded']:
-            explicit_graph[s]['prob'] = 0
+    if p_zero:
+        for s in Z:
+            if not check_goal(s, goal) and not explicit_graph[s]['solved'] and explicit_graph[s]['expanded']:
+                explicit_graph[s]['prob'] = 0
 
     for s, n in explicit_graph.items():
         V[V_i[s]] = n['value']
         P[V_i[s]] = n['prob']
         pi[V_i[s]] = n['pi']
+    #print('P mean:', P.mean())
 
     i = 0
 
@@ -657,6 +660,7 @@ def lao_dual_criterion(s0,
                        lamb,
                        env,
                        epsilon=1e-3,
+                       p_zero=True,
                        explicit_graph=None):
     bpsg = {s0: {"Adj": []}}
     explicit_graph = explicit_graph or {}
@@ -699,7 +703,7 @@ def lao_dual_criterion(s0,
             print("explicit graph size:", explicit_graph_cur_size)
             print("Z size:", len(Z))
             explicit_graph, _, n_updates_ = value_iteration_dual_criterion(
-                explicit_graph, bpsg, A, Z, goal, lamb, C, epsilon=epsilon)
+                explicit_graph, bpsg, A, Z, goal, lamb, C, epsilon=epsilon, p_zero=p_zero)
             print(f"Finished value iteration in {n_updates_} updates")
             n_updates += n_updates_
             bpsg = update_partial_solution(s0, bpsg, explicit_graph)
@@ -716,7 +720,9 @@ def lao_dual_criterion(s0,
             lamb,
             C,
             epsilon=epsilon,
+            p_zero=p_zero,
             convergence_test=True)
+        print(f"Finished convergence test in {n_updates_} updates")
         n_updates += n_updates_
 
         bpsg = update_partial_solution(s0, bpsg, explicit_graph)

@@ -601,24 +601,24 @@ def eliminate_traps(bpsg, goal, A, explicit_graph, env):
         actions_diff_state = set()
         for s in trap:
             if not explicit_graph[s]['expanded']:
-                all_succs = set()
-                for a in A:
-                    succs = get_successor_states_check_exception(s, a, env.domain)
-                    all_succs.update(set(succs))
-                    for s_ in succs:
-                        if s_ != s:
-                            actions_diff_state.add(a)
-                        if s_ not in trap:
-                            found_action = True
-                            actions.add(a)
-            else:
-                for adj in explicit_graph[s]['Adj']:
-                    s_ = adj['state']
-                    if s_ != s:
-                        actions_diff_state.update(set(adj['A']))
-                    if s_ not in trap:
-                        found_action = True
-                        actions.update(set(adj['A']))
+                explicit_graph = expand_state_dual_criterion(s, h_v, h_p, env, explicit_graph, A, p_zero=False)
+                #all_succs = set()
+                #for a in A:
+                #    succs = get_successor_states_check_exception(s, a, env.domain)
+                #    all_succs.update(set(succs))
+                #    for s_ in succs:
+                #        if s_ != s:
+                #            actions_diff_state.add(a)
+                #        if s_ not in trap:
+                #            found_action = True
+                #            actions.add(a)
+            for adj in explicit_graph[s]['Adj']:
+                s_ = adj['state']
+                if s_ != s:
+                    actions_diff_state.update(set(adj['A']))
+                if s_ not in trap:
+                    found_action = True
+                    actions.update(set(adj['A']))
 
         if not found_action:
             # permanent
@@ -676,7 +676,7 @@ def eliminate_traps(bpsg, goal, A, explicit_graph, env):
                 explicit_graph[s]['value'] = max_utility
                 explicit_graph[s]['prob'] = max_prob
 
-    return bpsg
+    return bpsg, explicit_graph
 
 
 
@@ -870,7 +870,7 @@ def lao_dual_criterion_fret(s0,
             n_updates += n_updates_
             bpsg = update_partial_solution(s0, bpsg, explicit_graph)
 
-            bpsg = eliminate_traps(bpsg, goal, A, explicit_graph, env)
+            bpsg, explicit_graph = eliminate_traps(bpsg, goal, A, explicit_graph, env)
 
             bpsg = update_partial_solution(s0, bpsg, explicit_graph)
 
@@ -893,7 +893,7 @@ def lao_dual_criterion_fret(s0,
 
         bpsg = update_partial_solution(s0, bpsg, explicit_graph)
         unexpanded = get_unexpanded_states(goal, explicit_graph, bpsg)
-        bpsg = eliminate_traps(bpsg, goal, A, explicit_graph, env)
+        bpsg, explicit_graph = eliminate_traps(bpsg, goal, A, explicit_graph, env)
 
         bpsg = update_partial_solution(s0, bpsg, explicit_graph)
 

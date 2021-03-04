@@ -571,54 +571,112 @@ def update_partial_solution_extended(s0, C, bpsg, explicit_graph):
     return bpsg_
 
 def is_trap(scc, sccs, goal, explicit_graph):
-    # detect if there is an edge that goes to a state
-    #   from other components that is not a goal
-    is_trap = False
+    """
+        detect if there is an edge that goes to a state
+        from other components that is not a goal
+    """
+
+    is_trap = True
     for s in scc:
-        if is_trap:
+        if check_goal(s, goal):
+            is_trap = False
+        if not is_trap:
             break
         for adj in explicit_graph[s]['Adj']:
             s_ = adj['state']
-            if s_ in scc or check_goal(s_, goal):
-                continue
-            is_trap = any([scc_ != scc and s_ in scc_ for scc_ in sccs])
-            if is_trap:
+            is_trap = not any([scc_ != scc and s_ in scc_ for scc_ in sccs])
+            if not is_trap:
                 break
     return is_trap
 
-def eliminate_traps(bpsg, goal, explicit_graph):
+def eliminate_traps(bpsg, goal, A, explicit_graph, env):
     sccs = get_sccs(bpsg)
 
-    traps = set(filter(lambda scc: is_trap(scc, sccs, goal, explicit_graph), sccs))
+    traps = set(filter(lambda scc: is_trap(scc, sccs, goal, bpsg), sccs))
 
-    for trap in traps:
+    for i, trap in enumerate(traps):
         # check if trap is transient or permanent
         found_action = False
         actions = set()
+        actions_diff_state = set()
         for s in trap:
-            for adj in explicit_graph[s]['Adj']:
-                s_ = adj['state']
-                if s_ not in trap:
-                    found_action = True
-                    actions.update(set(adj['A']))
+            if not explicit_graph[s]['expanded']:
+                all_succs = set()
+                for a in A:
+                    succs = get_successor_states_check_exception(s, a, env.domain)
+                    all_succs.update(set(succs))
+                    for s_ in succs:
+                        if s_ != s:
+                            actions_diff_state.add(a)
+                        if s_ not in trap:
+                            found_action = True
+                            actions.add(a)
+            else:
+                for adj in explicit_graph[s]['Adj']:
+                    s_ = adj['state']
+                    if s_ != s:
+                        actions_diff_state.update(set(adj['A']))
+                    if s_ not in trap:
+                        found_action = True
+                        actions.update(set(adj['A']))
 
-        print('found_action', found_action)
-        exit()
         if not found_action:
             # permanent
             for s in trap:
                 explicit_graph[s]['value'] = 0
                 explicit_graph[s]['prob'] = 0
+                explicit_graph[s]['solved'] = True
         else:
             # transient
-            max_utility = max([explicit_graph[s]['Q_v'][a] for s in trap for a in actions])
-            max_prob = max([explicit_graph[s]['Q_p'][a] for s in trap for a in actions])
+            shape = len(trap), len(actions)
+            A_i = {a: i for i, a in enumerate(A)}
+            Q_v = np.zeros(shape)
+            Q_p = np.zeros(shape)
+            trap_states = list(trap)
+            action_list = list(actions)
+            for i, s in enumerate(trap_states):
+                for i_a, a in enumerate(action_list):
+                    Q_v[i][i_a] = explicit_graph[s]['Q_v'][a]
+                    Q_p[i][i_a] = explicit_graph[s]['Q_p'][a]
+            max_prob = np.max(Q_p)
+            i_max_prob = np.argwhere(Q_p == max_prob)
+            i_s_a_max_prob = {i: set() for i in set(i_max_prob.T[0])}
+            for i_s, i_a in i_max_prob:
+                i_s_a_max_prob[i_s].add(i_a)
+
+            max_utility = -np.inf
+            a_max_utility = None
+            s_max_utility = None
+            for i_s, i_a_set in i_s_a_max_prob.items():
+                for i_a in i_a_set:
+                    if Q_v[i_s, i_a] > max_utility:
+                        max_utility = Q_v[i_s, i_a]
+                        a_max_utility = action_list[i_a]
+                        s_max_utility = trap_states[i_s]
+
             for s in trap:
+                if 'blacklist' not in explicit_graph[s]:
+                    explicit_graph[s]['blacklist'] = set()
+                blacklist = explicit_graph[s]['blacklist']
+                new_blacklisted = None
+                if s == s_max_utility:
+                    explicit_graph[s]['pi'] = a_max_utility
+
+                    # blacklist actions that are not in actions set
+                    new_blacklisted = set(A) - actions
+                else:
+                    # blacklist actions that go to the same state
+                    new_blacklisted = set(A) - actions_diff_state
+                assert len(new_blacklisted) < len(A)
+                # mark as changed if blacklist set changes
+                if new_blacklisted and (new_blacklisted != blacklist):
+                    explicit_graph[s]['blacklist'] = new_blacklisted
+
+
                 explicit_graph[s]['value'] = max_utility
                 explicit_graph[s]['prob'] = max_prob
 
-
-    return bpsg
+    return bpsg, changed
 
 
 
@@ -815,7 +873,9 @@ def lao_dual_criterion_fret(s0,
             n_updates += n_updates_
             bpsg = update_partial_solution(s0, bpsg, explicit_graph)
 
-            bpsg = eliminate_traps(bpsg, goal, explicit_graph)
+            bpsg = eliminate_traps(bpsg, goal, A, explicit_graph, env)
+
+            bpsg = update_partial_solution(s0, bpsg, explicit_graph)
 
             unexpanded = get_unexpanded_states(goal, explicit_graph, bpsg)
             i += 1
@@ -836,6 +896,9 @@ def lao_dual_criterion_fret(s0,
 
         bpsg = update_partial_solution(s0, bpsg, explicit_graph)
         unexpanded = get_unexpanded_states(goal, explicit_graph, bpsg)
+        bpsg = eliminate_traps(bpsg, goal, A, explicit_graph, env)
+
+        bpsg = update_partial_solution(s0, bpsg, explicit_graph)
 
         if converged and len(unexpanded) == 0:
             break

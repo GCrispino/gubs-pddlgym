@@ -711,7 +711,6 @@ def value_iteration_dual_criterion(explicit_graph,
                     explicit_graph[s]['Q_p'][a] = 0
 
     for s, n in explicit_graph.items():
-        k = sorted(list(n.keys()))
         V[V_i[s]] = n['value']
         P[V_i[s]] = n['prob']
         pi[V_i[s]] = n['pi']
@@ -736,6 +735,7 @@ def value_iteration_dual_criterion(explicit_graph,
                 continue
             #if not p_zero and explicit_graph[s]['prob'] < epsilon:
             #    continue
+            A_blacklist = explicit_graph[s]['blacklist'] if 'blacklist' in explicit_graph[s] else set()
             n_updates += 1
             all_reachable = np.array(
                 [find_reachable(s, a, explicit_graph) for a in A], dtype=object)
@@ -747,13 +747,12 @@ def value_iteration_dual_criterion(explicit_graph,
             Q_p[V_i[s]] = actions_results_p
 
             # set maxprob
-            max_prob = np.max(actions_results_p)
+            max_prob = np.max([res for i, res in enumerate(actions_results_p) if A[i] not in A_blacklist])
             P_[V_i[s]] = max_prob
-            i_A_max_prob = np.argwhere(
-                actions_results_p == max_prob).reshape(-1)
+            i_A_max_prob = np.array([i for i, res in enumerate(actions_results_p) if res == max_prob and A[i] not in A_blacklist])
+
             A_max_prob = A[i_A_max_prob]
-            not_max_prob_actions_results = actions_results_p[
-                actions_results_p != max_prob]
+            not_max_prob_actions_results = np.array([res for i, res in enumerate(actions_results_p) if A[i] not in A_blacklist])
 
             P_not_max_prob[V_i[s]] = P[V_i[s]] if len(
                 not_max_prob_actions_results) == 0 else np.max(
@@ -773,8 +772,6 @@ def value_iteration_dual_criterion(explicit_graph,
             V_[V_i[s]] = actions_results_max_prob[i_a]
             pi_[V_i[s]] = A_max_prob[i_a]
 
-        #print(V_i.values())
-        #print(len(V_i))
         v_norm = np.linalg.norm(V_[list(V_i.values())] - V[list(V_i.values())],
                                 np.inf)
         p_norm = np.linalg.norm(P_[list(V_i.values())] - P[list(V_i.values())],

@@ -676,7 +676,7 @@ def eliminate_traps(bpsg, goal, A, explicit_graph, env):
                 explicit_graph[s]['value'] = max_utility
                 explicit_graph[s]['prob'] = max_prob
 
-    return bpsg, changed
+    return bpsg
 
 
 

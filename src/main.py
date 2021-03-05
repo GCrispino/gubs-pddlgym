@@ -236,17 +236,12 @@ if args.algorithm == 'vi-dualonly' or args.algorithm == 'vi':
         #print('V dual:', P_dual.reshape(4, 4))
         #print("V_i:", {utils.get_values(s.literals, 'robot-at')[0][1].split(':')[0]: i for s, i in V_i.items()})
 elif args.algorithm == 'ao-dualonly':
-<<<<<<< HEAD
-    explicit_graph, bpsg, n_updates = mdp.lao_dual_criterion(
-        obs, h_v, h_p, goal, A, args.lamb, env, args.epsilon, not args.not_p_zero)
-=======
     if args.eliminate_traps:
         explicit_graph, bpsg, n_updates = mdp.lao_dual_criterion_fret(
             obs, h_v, h_p, goal, A, args.lamb, env, args.epsilon)
     else:
         explicit_graph, bpsg, n_updates = mdp.lao_dual_criterion(
-            obs, h_v, h_p, goal, A, args.lamb, env, args.epsilon)
->>>>>>> fret
+            obs, h_v, h_p, goal, A, args.lamb, env, args.epsilon, not args.not_p_zero)
 
     pi_func = lambda s: explicit_graph[s]['pi']
     #print(obs, explicit_graph[obs]['value'], explicit_graph[obs]['prob'], explicit_graph[obs]['pi'])

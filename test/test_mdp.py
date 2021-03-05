@@ -202,6 +202,14 @@ explicit_graph_test_dual_criterion = {
         "solved": False,
         "expanded": True,
         "pi": "None",
+        "Q_v": {
+            move1_operator_pred(): 1,
+            move2_operator_pred(): 1
+        },
+        "Q_p": {
+            move1_operator_pred(): 1,
+            move2_operator_pred(): 1
+        },
         "Adj": [
             {
                 "state": s2,
@@ -229,6 +237,14 @@ explicit_graph_test_dual_criterion = {
         "solved": False,
         "pi": None,
         "expanded": False,
+        "Q_v": {
+            move1_operator_pred(): 1,
+            move2_operator_pred(): 1
+        },
+        "Q_p": {
+            move1_operator_pred(): 1,
+            move2_operator_pred(): 1
+        },
         "Adj": [],
     },
     s3: {
@@ -237,6 +253,14 @@ explicit_graph_test_dual_criterion = {
         "solved": False,
         "pi": None,
         "expanded": False,
+        "Q_v": {
+            move1_operator_pred(): 1,
+            move2_operator_pred(): 1
+        },
+        "Q_p": {
+            move1_operator_pred(): 1,
+            move2_operator_pred(): 1
+        },
         "Adj": [],
     },
     de: {
@@ -245,6 +269,14 @@ explicit_graph_test_dual_criterion = {
         "solved": False,
         "pi": None,
         "expanded": False,
+        "Q_v": {
+            move1_operator_pred(): 1,
+            move2_operator_pred(): 1
+        },
+        "Q_p": {
+            move1_operator_pred(): 1,
+            move2_operator_pred(): 1
+        },
         "Adj": [],
     }
 }
@@ -296,16 +328,19 @@ bpsg_2 = {
 
 explicit_graph_test_dual_criterion_2 = {
     s1: {
-        "value":
-        np.exp(lamb),
-        "prob":
-        1,
-        "solved":
-        False,
-        "expanded":
-        True,
-        "pi":
-        move1_operator_pred(),
+        "value": np.exp(lamb),
+        "prob": 1,
+        "solved": False,
+        "expanded": True,
+        "pi": move1_operator_pred(),
+        "Q_v": {
+            move1_operator_pred(): 1,
+            move2_operator_pred(): 1
+        },
+        "Q_p": {
+            move1_operator_pred(): 1,
+            move2_operator_pred(): 1
+        },
         "Adj": [
             {
                 "state": s2,
@@ -333,6 +368,14 @@ explicit_graph_test_dual_criterion_2 = {
         "solved": False,
         "pi": None,
         "expanded": False,
+        "Q_v": {
+            move1_operator_pred(): 1,
+            move2_operator_pred(): 1
+        },
+        "Q_p": {
+            move1_operator_pred(): 1,
+            move2_operator_pred(): 1
+        },
         "Adj": [{
             "state": de,
             "A": {
@@ -346,6 +389,14 @@ explicit_graph_test_dual_criterion_2 = {
         "solved": False,
         "pi": None,
         "expanded": False,
+        "Q_v": {
+            move1_operator_pred(): 1,
+            move2_operator_pred(): 1
+        },
+        "Q_p": {
+            move1_operator_pred(): 1,
+            move2_operator_pred(): 1
+        },
         "Adj": [],
     },
     s3: {
@@ -354,22 +405,33 @@ explicit_graph_test_dual_criterion_2 = {
         "solved": False,
         "pi": None,
         "expanded": False,
+        "Q_v": {
+            move1_operator_pred(): 1,
+            move2_operator_pred(): 1
+        },
+        "Q_p": {
+            move1_operator_pred(): 1,
+            move2_operator_pred(): 1
+        },
         "Adj": [],
     }
 }
 
 explicit_graph_test_dual_criterion_3 = {
     s1: {
-        "value":
-        np.exp(lamb),
-        "prob":
-        1,
-        "solved":
-        False,
-        "expanded":
-        True,
-        "pi":
-        "a",
+        "value": np.exp(lamb),
+        "prob": 1,
+        "solved": False,
+        "expanded": True,
+        "pi": "a",
+        "Q_v": {
+            move1_operator_pred(): 1,
+            move2_operator_pred(): 1
+        },
+        "Q_p": {
+            move1_operator_pred(): 1,
+            move2_operator_pred(): 1
+        },
         "Adj": [
             {
                 "state": s2,
@@ -397,6 +459,14 @@ explicit_graph_test_dual_criterion_3 = {
         "solved": False,
         "pi": None,
         "expanded": False,
+        "Q_v": {
+            move1_operator_pred(): 1,
+            move2_operator_pred(): 1
+        },
+        "Q_p": {
+            move1_operator_pred(): 1,
+            move2_operator_pred(): 1
+        },
         "Adj": [{
             "state": de,
             "A": {
@@ -410,6 +480,14 @@ explicit_graph_test_dual_criterion_3 = {
         "solved": False,
         "pi": None,
         "expanded": True,
+        "Q_v": {
+            move1_operator_pred(): 1,
+            move2_operator_pred(): 1
+        },
+        "Q_p": {
+            move1_operator_pred(): 1,
+            move2_operator_pred(): 1
+        },
         "Adj": [{
             "state": s3,
             "A": {
@@ -423,6 +501,14 @@ explicit_graph_test_dual_criterion_3 = {
         "solved": False,
         "pi": None,
         "expanded": False,
+        "Q_v": {
+            move1_operator_pred(): 1,
+            move2_operator_pred(): 1
+        },
+        "Q_p": {
+            move1_operator_pred(): 1,
+            move2_operator_pred(): 1
+        },
         "Adj": [],
     }
 }
@@ -624,6 +710,18 @@ explicit_graph_river_test = {
         "expanded": False,
         "Adj": [],
     },
+}
+
+graph_ex = {
+    'u': {'Adj': [
+        {'state': 'v'},
+        {'state': 'x'},
+    ]},
+    'v': {'Adj': [{'state': 'y'}]},
+    'w': {'Adj': [{'state': 'y'}, {'state': 'z'}]},
+    'x': {'Adj': [{'state': 'v'}]},
+    'y': {'Adj': [{'state': 'x'}]},
+    'z': {'Adj': [{'state': 'z'}]},
 }
 
 
@@ -1043,3 +1141,85 @@ class TestMDPGraph(unittest.TestCase):
             (s2_gridworld, 1), bpsg_3_extended, C_test_domain_gridworld)
         ancestors = set(ancestors_)
         self.assertSetEqual(ancestors, set([(s1_gridworld, 0)]))
+
+
+    def test_dfs(self):
+        d, f, colors = mdp.dfs(graph)
+
+        self.assertListEqual(colors, ['b'] * len(graph))
+        self.assertListEqual(d, [1, 2, 3])
+        self.assertListEqual(f, [6, 5, 4])
+
+    def test_dfs_2(self):
+        # No need to define the 'A' dict for each state
+        #   because it is only a graph to test dfs,
+        #   not mdp functinoality
+
+        trace = []
+        d, f, colors = mdp.dfs(graph_ex, on_finish=lambda s, *_: trace.append(s))
+
+        self.assertListEqual(colors, ['b', 'b', 'b', 'b', 'b', 'b'])
+        self.assertListEqual(d, [1, 2, 9, 4, 3, 10])
+        self.assertListEqual(f, [8, 7, 12, 5, 6, 11])
+        self.assertListEqual(trace, ['x', 'y', 'v', 'u', 'z', 'w'])
+
+    def test_topological_sort(self):
+        topsort = mdp.topological_sort(graph)
+
+        self.assertListEqual(topsort, [s1_gridworld, s2_gridworld, s3_gridworld])
+
+    def test_topological_sort_2(self):
+
+        topsort = mdp.topological_sort(graph_ex)
+
+        self.assertListEqual(topsort, ['w', 'z', 'u', 'v', 'y', 'x'])
+
+    def test_sccs(self):
+        expected_sccs = set({
+            frozenset({'u'}),
+            frozenset({'v', 'x', 'y'}),
+            frozenset({'w'}),
+            frozenset({'z'})
+        })
+        print('graph_ex', graph_ex)
+        sccs = mdp.get_sccs(graph_ex)
+
+        self.assertSetEqual(sccs, expected_sccs)
+
+    def test_sccs_test_domain(self):
+        expected_sccs = set({
+            frozenset({s1}),
+            frozenset({s2}),
+            frozenset({s3}),
+            frozenset({de})
+        })
+        sccs = mdp.get_sccs(explicit_graph_test_dual_criterion_3)
+
+        self.assertSetEqual(sccs, expected_sccs)
+
+    def test_sccs_test_domain_2(self):
+        de1 = de
+        de2 = 'de2' # string just to represent new state
+        graph_ = deepcopy(explicit_graph_test_dual_criterion_3)
+        graph_[de1]['Adj'] = [{
+            "state": de2,
+            "A": { move1_operator_pred(): 1 }
+        }]
+        graph_[de2] = {
+            "Adj": [{
+                "state": de1,
+                "A": {
+                    move1_operator_pred(): 1
+                }
+            }]
+        }
+
+        expected_sccs = set({
+            frozenset({s1}),
+            frozenset({s2}),
+            frozenset({s3}),
+            frozenset({de1, de2})
+        })
+        sccs = mdp.get_sccs(graph_)
+
+        self.assertSetEqual(sccs, expected_sccs)

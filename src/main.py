@@ -27,6 +27,7 @@ DEFAULT_ALGORITHM = 'vi'
 DEFAULT_NOT_P_ZERO = False
 DEFAULT_SIMULATE = False
 DEFAULT_RENDER_AND_SAVE = False
+DEFAULT_ELIMINATE_TRAPS = False
 DEFAULT_PRINT_SIM_HISTORY = False
 DEFAULT_PLOT_STATS = False
 DEFAULT_OUTPUT_DIR = "./output"
@@ -78,6 +79,14 @@ def parse_args():
         help=
         "Defines whether or not to not set probability values to zero in dual criterion value iteration (default: %s)"
         % DEFAULT_NOT_P_ZERO)
+    parser.add_argument(
+        '--eliminate_traps',
+        dest='eliminate_traps',
+        default=DEFAULT_ELIMINATE_TRAPS,
+        action="store_true",
+        help=
+        "Defines whether or not to use trap elimination as in FRET (default: %s)"
+        % DEFAULT_ELIMINATE_TRAPS)
     parser.add_argument(
         '--simulate',
         dest='simulate',
@@ -227,15 +236,24 @@ if args.algorithm == 'vi-dualonly' or args.algorithm == 'vi':
         #print('V dual:', P_dual.reshape(4, 4))
         #print("V_i:", {utils.get_values(s.literals, 'robot-at')[0][1].split(':')[0]: i for s, i in V_i.items()})
 elif args.algorithm == 'ao-dualonly':
+<<<<<<< HEAD
     explicit_graph, bpsg, n_updates = mdp.lao_dual_criterion(
         obs, h_v, h_p, goal, A, args.lamb, env, args.epsilon, not args.not_p_zero)
+=======
+    if args.eliminate_traps:
+        explicit_graph, bpsg, n_updates = mdp.lao_dual_criterion_fret(
+            obs, h_v, h_p, goal, A, args.lamb, env, args.epsilon)
+    else:
+        explicit_graph, bpsg, n_updates = mdp.lao_dual_criterion(
+            obs, h_v, h_p, goal, A, args.lamb, env, args.epsilon)
+>>>>>>> fret
 
     pi_func = lambda s: explicit_graph[s]['pi']
     #print(obs, explicit_graph[obs]['value'], explicit_graph[obs]['prob'], explicit_graph[obs]['pi'])
     print('Result for initial state:', explicit_graph[obs]['prob'], explicit_graph[obs]['value'])
 elif args.algorithm == 'ao':
     explicit_graph, bpsg, explicit_graph_dc, C_maxs, n_updates, n_updates_dc, _ = mdp.egubs_ao(
-        obs, h_v, h_p, goal, A, args.k_g, args.lamb, env, args.epsilon)
+        obs, h_v, h_p, goal, A, args.k_g, args.lamb, env, args.epsilon, args.eliminate_traps)
 
     C_max = int(C_maxs[obs])
     print("C_max:", C_max)

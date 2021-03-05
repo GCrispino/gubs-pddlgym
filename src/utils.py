@@ -119,6 +119,7 @@ def expblocks_text_render(obs):
 text_render_env_functions = {
     "PDDLEnvTireworld-v0": tireworld_text_render,
     "PDDLEnvExplodingblocks-v0": expblocks_text_render,
+    "PDDLEnvExplodingblocksTest-v0": expblocks_text_render,
     "PDDLEnvRiver-alt-v0": river_alt_text_render,
 }
 

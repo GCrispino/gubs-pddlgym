@@ -79,7 +79,7 @@ def vi(S, succ_states, A, V_i, G_i, goal, env, gamma, epsilon):
     return V, pi
 
 
-def expand_state_dual_criterion(s, h_v, h_p, env, explicit_graph, goal, A, p_zero=True):
+def expand_state_dual_criterion(s, h_v, h_p, env, explicit_graph, goal, A, p_zero=True, succs_cache=None):
     if check_goal(s, goal):
         raise ValueError(
             f'State {s} can\'t be expanded because it is a goal state')
@@ -88,7 +88,10 @@ def expand_state_dual_criterion(s, h_v, h_p, env, explicit_graph, goal, A, p_zer
     neighbour_states = []
     i = 0
     for a in A:
-        succs = get_successor_states_check_exception(s, a, env.domain)
+        if succs_cache and (s, a) in succs_cache:
+            succs = succs_cache[(s, a)]
+        else:
+            succs = get_successor_states_check_exception(s, a, env.domain)
         for s_, p in succs.items():
             if s_ not in neighbour_states_dict:
                 neighbour_states_dict[s_] = i
@@ -589,7 +592,7 @@ def is_trap(scc, sccs, goal, explicit_graph):
                 break
     return is_trap
 
-def eliminate_traps(bpsg, goal, A, explicit_graph, env):
+def eliminate_traps(bpsg, goal, A, explicit_graph, env, succs_cache):
     sccs = get_sccs(bpsg)
 
     traps = set(filter(lambda scc: is_trap(scc, sccs, goal, bpsg), sccs))
@@ -604,6 +607,8 @@ def eliminate_traps(bpsg, goal, A, explicit_graph, env):
                 all_succs = set()
                 for a in A:
                     succs = get_successor_states_check_exception(s, a, env.domain)
+                    if (s, a) not in succs_cache:
+                        succs_cache[(s, a)] = succs
                     all_succs.update(set(succs))
                     for s_ in succs:
                         if s_ != s:
@@ -676,7 +681,7 @@ def eliminate_traps(bpsg, goal, A, explicit_graph, env):
                 explicit_graph[s]['value'] = max_utility
                 explicit_graph[s]['prob'] = max_prob
 
-    return bpsg, explicit_graph
+    return bpsg, succs_cache
 
 
 
@@ -824,6 +829,7 @@ def lao_dual_criterion_fret(s0,
                        explicit_graph=None):
     bpsg = {s0: {"Adj": []}}
     explicit_graph = explicit_graph or {}
+    succs_cache = {}
 
     if s0 in explicit_graph and explicit_graph[s0]['solved']:
         return explicit_graph, bpsg, 0
@@ -855,7 +861,7 @@ def lao_dual_criterion_fret(s0,
             Z = set()
             for s in unexpanded:
                 explicit_graph = expand_state_dual_criterion(
-                    s, h_v, h_p, env, explicit_graph, goal, A, p_zero=False)
+                    s, h_v, h_p, env, explicit_graph, goal, A, p_zero=False, succs_cache=succs_cache)
                 Z.add(s)
                 Z.update(find_ancestors(s, explicit_graph, best=True))
 
@@ -870,7 +876,7 @@ def lao_dual_criterion_fret(s0,
             n_updates += n_updates_
             bpsg = update_partial_solution(s0, bpsg, explicit_graph)
 
-            bpsg, explicit_graph = eliminate_traps(bpsg, goal, A, explicit_graph, env)
+            bpsg, succs_cache = eliminate_traps(bpsg, goal, A, explicit_graph, env, succs_cache)
 
             bpsg = update_partial_solution(s0, bpsg, explicit_graph)
 
@@ -892,10 +898,10 @@ def lao_dual_criterion_fret(s0,
         n_updates += n_updates_
 
         bpsg = update_partial_solution(s0, bpsg, explicit_graph)
-        unexpanded = get_unexpanded_states(goal, explicit_graph, bpsg)
-        bpsg, explicit_graph = eliminate_traps(bpsg, goal, A, explicit_graph, env)
+        bpsg, succs_cache = eliminate_traps(bpsg, goal, A, explicit_graph, env, succs_cache)
 
         bpsg = update_partial_solution(s0, bpsg, explicit_graph)
+        unexpanded = get_unexpanded_states(goal, explicit_graph, bpsg)
 
         if converged and len(unexpanded) == 0:
             break

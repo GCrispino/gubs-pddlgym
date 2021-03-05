@@ -239,7 +239,7 @@ elif args.algorithm == 'ao-dualonly':
     print('Result for initial state:', explicit_graph[obs]['prob'], explicit_graph[obs]['value'])
 elif args.algorithm == 'ao':
     explicit_graph, bpsg, explicit_graph_dc, C_maxs, n_updates, n_updates_dc, _ = mdp.egubs_ao(
-        obs, h_v, h_p, goal, A, args.k_g, args.lamb, env, args.epsilon)
+        obs, h_v, h_p, goal, A, args.k_g, args.lamb, env, args.epsilon, args.eliminate_traps)
 
     C_max = int(C_maxs[obs])
     print("C_max:", C_max)

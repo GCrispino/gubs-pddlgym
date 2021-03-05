@@ -990,7 +990,7 @@ def lao_dual_criterion(s0,
         explicit_graph[s_]['solved'] = True
     return explicit_graph, bpsg, n_updates
 
-def lao_dual_criterion_reachable(s0, h_v, h_p, goal, A, lamb, env, epsilon=1e-3):
+def lao_dual_criterion_reachable(s0, h_v, h_p, goal, A, lamb, env, epsilon=1e-3, eliminate_traps=False):
     #all_reachable = mg.find_all_reachable(s0, mdp_obj)
     all_reachable = set({s0})
     explicit_graph = {}
@@ -1000,8 +1000,12 @@ def lao_dual_criterion_reachable(s0, h_v, h_p, goal, A, lamb, env, epsilon=1e-3)
     while len(stack) > 0:
         s = stack.pop()
         print("Will call lao_dual_criterion for state:", utils.text_render(env, s))
-        explicit_graph, _, n_updates = lao_dual_criterion(
-            s, h_v, h_p, goal, A, lamb, env, epsilon=epsilon, explicit_graph=explicit_graph)
+        if eliminate_traps:
+            explicit_graph, _, n_updates = lao_dual_criterion_fret(
+                s, h_v, h_p, goal, A, lamb, env, epsilon=epsilon, explicit_graph=explicit_graph)
+        else:
+            explicit_graph, _, n_updates = lao_dual_criterion(
+                s, h_v, h_p, goal, A, lamb, env, epsilon=epsilon, explicit_graph=explicit_graph)
         n_updates_total += n_updates
         print(' finished lao dual criterion for', s, explicit_graph[s]['prob'], explicit_graph[s]['value'], len(
             [v for v in explicit_graph.values() if v['solved']]))
@@ -1104,9 +1108,9 @@ def value_iteration_gubs(explicit_graph, V_i, A, Z, k_g, lamb, C, env):
         i += 1
     return explicit_graph, i, changed
 
-def egubs_ao(s0, h_v, h_p, goal, A, k_g, lamb, env, epsilon=1e-3):
+def egubs_ao(s0, h_v, h_p, goal, A, k_g, lamb, env, epsilon=1e-3, eliminate_traps=False):
     explicit_graph_dc, n_updates_dc = lao_dual_criterion_reachable(
-        s0, h_v, h_p, goal, A, lamb, env, epsilon)
+        s0, h_v, h_p, goal, A, lamb, env, epsilon, eliminate_traps)
 
     V_risk = {s: explicit_graph_dc[s]['value']
               for s in explicit_graph_dc}

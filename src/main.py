@@ -327,8 +327,8 @@ if args.render_and_save:
             **vars(args), 'cpu_time': final_time,
             'n_updates': n_updates,
             'n_updates_dc': n_updates_dc,
-            'explicit_graph': explicit_graph_new_keys,
-            'explicit_graph_dc': explicit_graph_dc,
+            'explicit_graph_size': len(explicit_graph_new_keys) if explicit_graph_new_keys else 0,
+            'explicit_graph_dc_size': len(explicit_graph_dc) if explicit_graph_dc else 0,
             'C_max': C_max
         }, output_dir=output_dir)
     if output_file_path:

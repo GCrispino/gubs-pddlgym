@@ -362,9 +362,6 @@ def find_unreachable(s0, mdp):
     return [S[i] for i, c in enumerate(colors) if c != 'b']
 
 
-# TODO
-# Adicionar testes
-#   SCCs
 def dfs_visit(i, colors, d, f, low, time, S, V_i, mdp, on_visit=None, on_visit_neighbor=None, on_finish=None):
     colors[i] = 'g'
     time[0] += 1
@@ -797,7 +794,6 @@ def value_iteration_dual_criterion(explicit_graph,
         P = np.copy(P_)
         pi = np.copy(pi_)
 
-        # if (convergence_test and changed) or converged:
         if converged:
             print(
                 f'{convergence_test}, {changed}, {converged}, {v_norm}, {p_norm}, {min_p_diff}'
@@ -817,7 +813,7 @@ def value_iteration_dual_criterion(explicit_graph,
             explicit_graph[s]['Q_p'][a] = Q_p[V_i[s], A_i[a]]
 
     #print(f'{i} iterations')
-    return explicit_graph, converged, n_updates
+    return explicit_graph, converged, changed, n_updates
 
 def lao_dual_criterion_fret(s0,
                        h_v,
@@ -871,7 +867,7 @@ def lao_dual_criterion_fret(s0,
             explicit_graph_cur_size = len(explicit_graph)
             print("explicit graph size:", explicit_graph_cur_size)
             print("Z size:", len(Z))
-            explicit_graph, _, n_updates_ = value_iteration_dual_criterion(
+            explicit_graph, _, __, n_updates_ = value_iteration_dual_criterion(
                 explicit_graph, bpsg, A, Z, goal, lamb, C, epsilon=epsilon, p_zero=False)
             print(f"Finished value iteration in {n_updates_} updates")
             n_updates += n_updates_
@@ -885,7 +881,7 @@ def lao_dual_criterion_fret(s0,
             i += 1
         bpsg_states = [s_ for s_ in bpsg.keys() if not check_goal(s_, goal)]
         print(f"Will start convergence test for bpsg with {len(bpsg)} states")
-        explicit_graph, converged, n_updates_ = value_iteration_dual_criterion(
+        explicit_graph, converged, changed, n_updates_ = value_iteration_dual_criterion(
             explicit_graph,
             bpsg,
             A,
@@ -903,6 +899,9 @@ def lao_dual_criterion_fret(s0,
 
         bpsg = update_partial_solution(s0, bpsg, explicit_graph)
         unexpanded = get_unexpanded_states(goal, explicit_graph, bpsg)
+
+        if changed:
+            continue
 
         if converged and len(unexpanded) == 0:
             break
@@ -962,7 +961,7 @@ def lao_dual_criterion(s0,
             explicit_graph_cur_size = len(explicit_graph)
             print("explicit graph size:", explicit_graph_cur_size)
             print("Z size:", len(Z))
-            explicit_graph, _, n_updates_ = value_iteration_dual_criterion(
+            explicit_graph, _, __, n_updates_ = value_iteration_dual_criterion(
                 explicit_graph, bpsg, A, Z, goal, lamb, C, epsilon=epsilon, p_zero=p_zero)
             print(f"Finished value iteration in {n_updates_} updates")
             n_updates += n_updates_
@@ -971,7 +970,7 @@ def lao_dual_criterion(s0,
             i += 1
         bpsg_states = [s_ for s_ in bpsg.keys() if not check_goal(s_, goal)]
         print(f"Will start convergence test for bpsg with {len(bpsg)} states")
-        explicit_graph, converged, n_updates_ = value_iteration_dual_criterion(
+        explicit_graph, converged, changed, n_updates_ = value_iteration_dual_criterion(
             explicit_graph,
             bpsg,
             A,

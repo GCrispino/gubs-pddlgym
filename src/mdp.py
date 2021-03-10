@@ -584,9 +584,10 @@ def is_trap(scc, sccs, goal, explicit_graph):
             break
         for adj in explicit_graph[s]['Adj']:
             s_ = adj['state']
-            is_trap = not any([scc_ != scc and s_ in scc_ for scc_ in sccs])
-            if not is_trap:
-                break
+            for scc_ in sccs:
+                if scc_ != scc and s_ in scc_:
+                    is_trap = False
+                    break
     return is_trap
 
 def eliminate_traps(bpsg, goal, A, explicit_graph, env, succs_cache):

@@ -135,3 +135,5 @@ dmypy.json
 .vscode/
 
 output/
+profiling/
+profile*

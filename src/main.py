@@ -65,12 +65,16 @@ def parse_args():
                         default=DEFAULT_KG,
                         help="Constant goal utility (default: %s)" %
                         str(DEFAULT_LAMBDA))
-    parser.add_argument('--algorithm',
-                        dest='algorithm',
-                        choices=['vi', 'vi-dualonly', 'ao', 'ao-dualonly'],
+    parser.add_argument('--algorithm_dc',
+                        dest='algorithm_dc',
+                        choices=['vi', 'lao', 'lao_eliminate_traps', 'ilao'],
                         default=DEFAULT_ALGORITHM,
-                        help="Algorithm to run (default: %s)" %
-                        DEFAULT_ALGORITHM)
+                        help="Algorithm to solve the dual criterion (default: %s)" % DEFAULT_ALGORITHM)
+    parser.add_argument('--algorithm_gubs',
+                        dest='algorithm_gubs',
+                        choices=['vi', 'ao'],
+                        default=DEFAULT_ALGORITHM,
+                        help="Algorithm to solve the eGUBS criterion (default: %s)" % DEFAULT_ALGORITHM)
     parser.add_argument(
         '--not_p_zero',
         dest='not_p_zero',
@@ -192,7 +196,7 @@ keep_cost = False
 
 print('obtaining optimal policy')
 start = time.time()
-if args.algorithm == 'vi-dualonly' or args.algorithm == 'vi':
+if args.algorithm_dc == 'vi':
     print(' calculating list of states...')
     reach = mdp.get_all_reachable(obs, A, env)
     S = list(sorted([s for s in reach]))
@@ -217,7 +221,7 @@ if args.algorithm == 'vi-dualonly' or args.algorithm == 'vi':
                                                           epsilon=args.epsilon)
 
     n_updates_dc = i_dual * len(S)
-    if args.algorithm == 'vi':
+    if args.algorithm_gubs == 'vi':
         C_max = gubs.get_cmax(V_dual, V_i, P_dual, S, succ_states, A,
                               args.lamb, args.k_g)
         print("C_max:", C_max)
@@ -232,21 +236,29 @@ if args.algorithm == 'vi-dualonly' or args.algorithm == 'vi':
         pi_func = lambda s: pi_dual[V_i[s]]
         n_updates = n_updates_dc
         print('Result for initial state:', P_dual[V_i[obs]], V_dual[V_i[obs]])
-        #print('V dual:', V_dual.reshape(4, 4))
-        #print('V dual:', P_dual.reshape(4, 4))
-        #print("V_i:", {utils.get_values(s.literals, 'robot-at')[0][1].split(':')[0]: i for s, i in V_i.items()})
-elif args.algorithm == 'ao-dualonly':
-    if args.eliminate_traps:
+
+elif args.algorithm_dc == 'lao' or args.algorithm_dc == 'lao_eliminate_traps' or args.algorithm_dc == 'ilao':
+    if args.algorithm_dc == 'lao_eliminate_traps':
         explicit_graph, bpsg, n_updates = mdp.lao_dual_criterion_fret(
             obs, h_v, h_p, goal, A, args.lamb, env, args.epsilon)
-    else:
+    elif args.algorithm_dc == 'lao':
         explicit_graph, bpsg, n_updates = mdp.lao_dual_criterion(
             obs, h_v, h_p, goal, A, args.lamb, env, args.epsilon, not args.not_p_zero)
+    elif args.algorithm_dc == 'ilao':
+        explicit_graph, bpsg, n_updates = mdp.ilao_dual_criterion_fret(
+            obs, h_v, h_p, goal, A, args.lamb, env, args.epsilon)
 
     pi_func = lambda s: explicit_graph[s]['pi']
-    #print(obs, explicit_graph[obs]['value'], explicit_graph[obs]['prob'], explicit_graph[obs]['pi'])
+
     print('Result for initial state:', explicit_graph[obs]['prob'], explicit_graph[obs]['value'])
-elif args.algorithm == 'ao':
+elif args.algorithm == 'ao-dualonly-ilao':
+    explicit_graph, bpsg, n_updates = mdp.ilao_dual_criterion_fret(
+        obs, h_v, h_p, goal, A, args.lamb, env, args.epsilon)
+
+    pi_func = lambda s: explicit_graph[s]['pi']
+
+    print('Result for initial state:', explicit_graph[obs]['prob'], explicit_graph[obs]['value'])
+if args.algorithm_gubs == 'ao':
     explicit_graph, bpsg, explicit_graph_dc, C_maxs, n_updates, n_updates_dc, _ = mdp.egubs_ao(
         obs, h_v, h_p, goal, A, args.k_g, args.lamb, env, args.epsilon, args.eliminate_traps)
 

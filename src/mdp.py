@@ -113,15 +113,17 @@ def expand_state_dual_criterion(s, h_v, h_p, env, explicit_graph, goal, A, p_zer
 
     for n in unexpanded_neighbours:
         if n['state'] != s:
+            h_v_ = h_v(n['state'])
+            h_p_ = h_p(n['state'])
             is_goal = check_goal(n['state'], goal)
             new_explicit_graph[n['state']] = {
-                "value": 1 if is_goal else h_v(n['state']),
-                "prob": 1 if is_goal else h_p(n['state']),
+                "value": 1 if is_goal else h_v_,
+                "prob": 1 if is_goal else h_p_,
                 "solved": False,
                 "pi": None,
                 "expanded": False,
-                "Q_v": {a: 1 if is_goal else h_v(n['state']) for a in A},
-                "Q_p": {a: 1 if is_goal else h_p(n['state']) for a in A},
+                "Q_v": {a: 1 if is_goal else h_v_ for a in A},
+                "Q_p": {a: 1 if is_goal else h_p_ for a in A},
                 "Adj": []
             }
 

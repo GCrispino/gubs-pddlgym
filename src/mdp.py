@@ -365,37 +365,32 @@ def find_unreachable(s0, mdp):
 
 
 def dfs_visit(i, colors, d, f, low, time, S, V_i, mdp, on_visit=None, on_visit_neighbor=None, on_finish=None):
-    stack = deque([i])
+    colors[i] = 'g'
+    time[0] += 1
+    d[i] = time[0]
+    low[i] = time[0]
+    s = S[i]
 
-    while len(stack) > 0:
-        i = stack.pop()
-        colors[i] = 'g'
-        time[0] += 1
-        d[i] = time[0]
-        low[i] = time[0]
-        s = S[i]
+    if on_visit:
+        on_visit(s, i, d, low)
 
-        if on_visit:
-            on_visit(s, i, d, low)
+    for s_obj in mdp[s]['Adj']:
+        s_ = s_obj['state']
+        if s_ not in mdp:
+            continue
+        j = V_i[s_]
+        if colors[j] == 'w':
+            dfs_visit(j, colors, d, f, low, time, S, V_i, mdp, on_visit, on_visit_neighbor, on_finish)
+            low[i] = min(low[i], low[j])
+        if on_visit_neighbor:
+            on_visit_neighbor(s, i, s_, j, d, low)
 
-        for s_obj in mdp[s]['Adj']:
-            s_ = s_obj['state']
-            if s_ not in mdp:
-                continue
-            j = V_i[s_]
-            if colors[j] == 'w':
-                #dfs_visit(j, colors, d, f, low, time, S, V_i, mdp, on_visit, on_visit_neighbor, on_finish)
-                stack.append(j)
-                low[i] = min(low[i], low[j])
-            if on_visit_neighbor:
-                on_visit_neighbor(s, i, s_, j, d, low)
+    if on_finish:
+        on_finish(s, i, d, low)
 
-        if on_finish:
-            on_finish(s, i, d, low)
-
-        colors[i] = 'b'
-        time[0] += 1
-        f[i] = time[0]
+    colors[i] = 'b'
+    time[0] += 1
+    f[i] = time[0]
 
 
 def dfs(mdp, on_visit=None, on_visit_neighbor=None, on_finish=None):

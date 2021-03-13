@@ -582,18 +582,22 @@ def is_trap(scc, sccs, goal, explicit_graph):
     for s in scc:
         if check_goal(s, goal):
             is_trap = False
-        if not is_trap:
-            break
         for adj in explicit_graph[s]['Adj']:
             s_ = adj['state']
-            for scc_ in sccs:
-                if scc_ != scc and s_ in scc_:
-                    is_trap = False
-                    break
+            if explicit_graph[s_]['scc'] != explicit_graph[s]['scc']:
+                is_trap = False
+                break
+        if not is_trap:
+            break
     return is_trap
 
 def eliminate_traps(bpsg, goal, A, explicit_graph, env, succs_cache):
-    sccs = get_sccs(bpsg)
+    sccs = list(get_sccs(bpsg))
+
+    # store scc index for each state in bpsg
+    for i, scc in enumerate(sccs):
+        for s in scc:
+            bpsg[s]['scc'] = i
 
     traps = set(filter(lambda scc: is_trap(scc, sccs, goal, bpsg), sccs))
 

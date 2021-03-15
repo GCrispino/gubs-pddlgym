@@ -72,7 +72,7 @@ def parse_args():
                         help="Algorithm to solve the dual criterion (default: %s)" % DEFAULT_ALGORITHM)
     parser.add_argument('--algorithm_gubs',
                         dest='algorithm_gubs',
-                        choices=['vi', 'ao'],
+                        choices=['vi', 'ao', 'none'],
                         default=DEFAULT_ALGORITHM,
                         help="Algorithm to solve the eGUBS criterion (default: %s)" % DEFAULT_ALGORITHM)
     parser.add_argument(

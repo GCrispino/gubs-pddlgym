@@ -440,7 +440,7 @@ def topological_sort(mdp):
     dfs(mdp, on_finish=dfs_fn)
     return list(reversed(stack))
 
-def update_action_partial_solution(s, s0, a, bpsg, explicit_graph):
+def update_action_partial_solution(s, s0, bpsg, explicit_graph):
     """
         Updates partial solution given pair of state and action
     """
@@ -471,9 +471,8 @@ def update_action_partial_solution(s, s0, a, bpsg, explicit_graph):
 
 def update_partial_solution(s0, bpsg, explicit_graph):
     bpsg_ = copy(bpsg)
-    S = explicit_graph.keys()
 
-    for s in S:
+    for s in bpsg:
         a = explicit_graph[s]['pi']
         if s not in bpsg_:
             continue
@@ -482,13 +481,13 @@ def update_partial_solution(s0, bpsg, explicit_graph):
 
         if len(s_obj['Adj']) == 0:
             if a is not None:
-                bpsg_ = update_action_partial_solution(s, s0, a, bpsg_,
+                bpsg_ = update_action_partial_solution(s, s0, bpsg_,
                                                        explicit_graph)
         else:
             best_current_action = next(iter(s_obj['Adj'][0]['A'].keys()))
 
             if a is not None and best_current_action != a:
-                bpsg_ = update_action_partial_solution(s, s0, a, bpsg_,
+                bpsg_ = update_action_partial_solution(s, s0, bpsg_,
                                                        explicit_graph)
 
     unreachable = find_unreachable(s0, bpsg_)

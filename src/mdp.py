@@ -466,12 +466,6 @@ def update_action_partial_solution(s, s0, a, bpsg, explicit_graph):
                     states.append(s_)
         i += 1
 
-    unreachable = find_unreachable(s0, bpsg_)
-
-    for s_ in unreachable:
-        if s_ in bpsg_:
-            bpsg_.pop(s_)
-
     return bpsg_
 
 
@@ -496,6 +490,12 @@ def update_partial_solution(s0, bpsg, explicit_graph):
             if a is not None and best_current_action != a:
                 bpsg_ = update_action_partial_solution(s, s0, a, bpsg_,
                                                        explicit_graph)
+
+    unreachable = find_unreachable(s0, bpsg_)
+
+    for s_ in unreachable:
+        if s_ in bpsg_:
+            bpsg_.pop(s_)
 
     return bpsg_
 

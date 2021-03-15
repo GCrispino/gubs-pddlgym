@@ -498,7 +498,7 @@ def update_partial_solution(s0, bpsg, explicit_graph):
 
     return bpsg_
 
-def update_action_partial_solution_extended(s, s0, C, a, bpsg, explicit_graph):
+def update_action_partial_solution_extended(s, s0, C, bpsg, explicit_graph):
     """
         Updates partial solution given pair of state and action
     """
@@ -512,13 +512,10 @@ def update_action_partial_solution_extended(s, s0, C, a, bpsg, explicit_graph):
         s_obj = bpsg_[s]
 
         s_obj['Adj'] = []
-        #reachable = find_reachable(s[0], a, mdp)
         reachable = find_reachable(s, a, explicit_graph)
 
         for s_obj_ in reachable:
             s_ = s_obj_['state']
-            #c_ = s[1] + C(s[0], a)
-            #s_extended = (s_, c_)
             s_obj['Adj'].append({
                 'state': s_,
                 'A': {a: s_obj_['A'][a]}
@@ -533,25 +530,17 @@ def update_action_partial_solution_extended(s, s0, C, a, bpsg, explicit_graph):
                 }
                 bpsg_[s] = s_obj
 
-                #if s_extended in explicit_graph and explicit_graph[s_extended]['expanded']:
                 if s_ in explicit_graph and explicit_graph[s_]['expanded']:
                     states.append(s_)
         i += 1
-
-    unreachable = find_unreachable((s0, 0), bpsg_)
-
-    for s_ in unreachable:
-        if s_ in bpsg_:
-            bpsg_.pop(s_)
 
     return bpsg_
 
 
 def update_partial_solution_extended(s0, C, bpsg, explicit_graph):
     bpsg_ = copy(bpsg)
-    S = explicit_graph.keys()
 
-    for s in S:
+    for s in bpsg:
         a = explicit_graph[s]['pi']
         if s not in bpsg_:
             continue
@@ -561,13 +550,19 @@ def update_partial_solution_extended(s0, C, bpsg, explicit_graph):
         if len(s_obj['Adj']) == 0:
             if a is not None:
                 bpsg_ = update_action_partial_solution_extended(
-                    s, s0, C, a, bpsg_, explicit_graph)
+                    s, s0, C, bpsg_, explicit_graph)
         else:
             best_current_action = next(iter(s_obj['Adj'][0]['A'].keys()))
 
             if a is not None and best_current_action != a:
                 bpsg_ = update_action_partial_solution_extended(
-                    s, s0, C, a, bpsg_, explicit_graph)
+                    s, s0, C, bpsg_, explicit_graph)
+
+    unreachable = find_unreachable((s0, 0), bpsg_)
+
+    for s_ in unreachable:
+        if s_ in bpsg_:
+            bpsg_.pop(s_)
 
     return bpsg_
 
@@ -1058,7 +1053,7 @@ def lao_dual_criterion_reachable(s0, h_v, h_p, goal, A, lamb, env, epsilon=1e-3,
             explicit_graph, _, n_updates = lao_dual_criterion(
                 s, h_v, h_p, goal, A, lamb, env, epsilon=epsilon, explicit_graph=explicit_graph)
         n_updates_total += n_updates
-        print(' finished lao dual criterion for', s, explicit_graph[s]['prob'], explicit_graph[s]['value'], len(
+        print(' finished lao dual criterion for', utils.text_render(env, s), explicit_graph[s]['prob'], explicit_graph[s]['value'], len(
             [v for v in explicit_graph.values() if v['solved']]))
         for s_ in explicit_graph:
             if s_ not in all_reachable:

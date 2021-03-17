@@ -1045,6 +1045,9 @@ def lao_dual_criterion_reachable(s0, h_v, h_p, goal, A, lamb, env, epsilon=1e-3,
     n_updates_total = 0
     while len(stack) > 0:
         s = stack.pop()
+        if s in explicit_graph and explicit_graph[s]['solved']:
+            continue
+
         print("Will call lao_dual_criterion for state:", utils.text_render(env, s))
         if eliminate_traps:
             explicit_graph, _, n_updates = lao_dual_criterion_fret(

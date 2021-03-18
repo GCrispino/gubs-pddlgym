@@ -196,7 +196,19 @@ keep_cost = False
 
 print('obtaining optimal policy')
 start = time.time()
-if args.algorithm_dc == 'vi':
+if args.algorithm_gubs == 'ao':
+    explicit_graph, bpsg, explicit_graph_dc, C_maxs, n_updates, n_updates_dc, _ = mdp.egubs_ao(
+        obs, h_v, h_p, goal, A, args.k_g, args.lamb, env, args.epsilon, args.eliminate_traps, args.algorithm_dc == 'ilao')
+
+    C_max = int(C_maxs[obs])
+    print("C_max:", C_max)
+    solved_states = [s for s, v in explicit_graph_dc.items() if v['solved']]
+    pi_func = lambda s, C: explicit_graph[(s, C)]['pi'] if (s, C) in explicit_graph else explicit_graph_dc[s]['pi']
+    keep_cost = True
+    #print('Size explicit graph dc:', len(explicit_graph_dc))
+    print('Result for initial state dc:', explicit_graph_dc[obs]['prob'], explicit_graph_dc[obs]['value'])
+    print('Result for initial state:', explicit_graph[(obs, 0)]['prob'], explicit_graph[(obs, 0)]['value'], explicit_graph[(obs, 0)]['value'] + args.k_g * explicit_graph[(obs, 0)]['prob'])
+elif args.algorithm_dc == 'vi':
     print(' calculating list of states...')
     reach = mdp.get_all_reachable(obs, A, env)
     S = list(sorted([s for s in reach]))
@@ -258,18 +270,6 @@ elif args.algorithm == 'ao-dualonly-ilao':
     pi_func = lambda s: explicit_graph[s]['pi']
 
     print('Result for initial state:', explicit_graph[obs]['prob'], explicit_graph[obs]['value'])
-if args.algorithm_gubs == 'ao':
-    explicit_graph, bpsg, explicit_graph_dc, C_maxs, n_updates, n_updates_dc, _ = mdp.egubs_ao(
-        obs, h_v, h_p, goal, A, args.k_g, args.lamb, env, args.epsilon, args.eliminate_traps)
-
-    C_max = int(C_maxs[obs])
-    print("C_max:", C_max)
-    solved_states = [s for s, v in explicit_graph_dc.items() if v['solved']]
-    pi_func = lambda s, C: explicit_graph[(s, C)]['pi'] if (s, C) in explicit_graph else explicit_graph_dc[s]['pi']
-    keep_cost = True
-    #print('Size explicit graph dc:', len(explicit_graph_dc))
-    print('Result for initial state dc:', explicit_graph_dc[obs]['prob'], explicit_graph_dc[obs]['value'])
-    print('Result for initial state:', explicit_graph[(obs, 0)]['prob'], explicit_graph[(obs, 0)]['value'], explicit_graph[(obs, 0)]['value'] + args.k_g * explicit_graph[(obs, 0)]['prob'])
 final_time = time.time() - start
 
 if n_updates_dc:

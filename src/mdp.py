@@ -184,7 +184,7 @@ def expand_state_gubs(s, env, goal, explicit_graph, C, C_maxs, V_risk, P_risk, p
 
     return new_explicit_graph
 
-def expand_state_gubs_v2(s, h, env, goal, explicit_graph, C, C_maxs, V_risk, P_risk, pi_risk, V_i, A, k_g, lamb):
+def expand_state_gubs_v2(s, h, env, goal, explicit_graph, C, C_maxs, V_risk, P_risk, pi_risk, V_i, A, k_g, lamb, succs_cache=None):
     if check_goal(s[0], goal):
         raise ValueError(
             f'State {s[0]} can\'t be expanded because it is a goal state')
@@ -196,7 +196,11 @@ def expand_state_gubs_v2(s, h, env, goal, explicit_graph, C, C_maxs, V_risk, P_r
 
     i = 0
     for a in A:
-        succs = get_successor_states_check_exception(s[0], a, env.domain)
+        if succs_cache and (s[0], a) in succs_cache:
+            succs = succs_cache[(s[0], a)]
+        else:
+            succs = get_successor_states_check_exception(s[0], a, env.domain)
+            succs_cache[(s[0], a)] = succs
         for s_, p in succs.items():
             c_ = s[1] + C(s_, a)
             if (s_, c_) not in neighbour_states_dict:
@@ -252,7 +256,7 @@ def expand_state_gubs_v2(s, h, env, goal, explicit_graph, C, C_maxs, V_risk, P_r
 
     new_explicit_graph[s]['expanded'] = True
 
-    return new_explicit_graph, C_maxs
+    return new_explicit_graph, C_maxs, succs_cache
 
 
 def get_unexpanded_states(goal, explicit_graph, bpsg):
@@ -1071,7 +1075,7 @@ def lao_dual_criterion_reachable(s0, h_v, h_p, goal, A, lamb, env, epsilon=1e-3,
     #pi = {s: explicit_graph[s]['pi']
     #      for s in sorted(explicit_graph, key=int)}
     #print(' pi:', pi)
-    return explicit_graph, n_updates_total
+    return explicit_graph, n_updates_total, succs_cache
 
 def value_iteration_gubs(explicit_graph, V_i, A, Z, k_g, lamb, C, env):
     n_actions = len(A)
@@ -1170,13 +1174,14 @@ def ilao_dual_criterion_fret(s0,
                        lamb,
                        env,
                        epsilon=1e-3,
-                       explicit_graph=None):
+                       explicit_graph=None,
+                       succs_cache=None):
     bpsg = {s0: {"Adj": []}}
     explicit_graph = explicit_graph or {}
-    succs_cache = {}
+    succs_cache = {} if succs_cache == None else succs_cache
 
     if s0 in explicit_graph and explicit_graph[s0]['solved']:
-        return explicit_graph, bpsg, 0
+        return explicit_graph, bpsg, 0, succs_cache
 
     if s0 not in explicit_graph:
         explicit_graph[s0] = {
@@ -1259,11 +1264,11 @@ def ilao_dual_criterion_fret(s0,
             break
     for s_ in bpsg:
         explicit_graph[s_]['solved'] = True
-    return explicit_graph, bpsg, n_updates
+    return explicit_graph, bpsg, n_updates, succs_cache
 
-def egubs_ao(s0, h_v, h_p, goal, A, k_g, lamb, env, epsilon=1e-3, eliminate_traps=False):
-    explicit_graph_dc, n_updates_dc = lao_dual_criterion_reachable(
-        s0, h_v, h_p, goal, A, lamb, env, epsilon, eliminate_traps)
+def egubs_ao(s0, h_v, h_p, goal, A, k_g, lamb, env, epsilon=1e-3, eliminate_traps=False, ilao_dc=False):
+    explicit_graph_dc, n_updates_dc, succs_cache = lao_dual_criterion_reachable(
+        s0, h_v, h_p, goal, A, lamb, env, epsilon, eliminate_traps, ilao_dc)
 
     V_risk = {s: explicit_graph_dc[s]['value']
               for s in explicit_graph_dc}
@@ -1333,8 +1338,8 @@ def egubs_ao(s0, h_v, h_p, goal, A, k_g, lamb, env, epsilon=1e-3, eliminate_trap
         #explicit_graph, C_maxs = expand_state_gubs_v2(
         #    s, h_v, env, goal, explicit_graph, C, C_maxs, V_risk, P_risk, pi_risk, V_i, A, k_g, lamb)
         for s in unexpanded:
-            explicit_graph, C_maxs = expand_state_gubs_v2(
-            s, h_v, env, goal, explicit_graph, C, C_maxs, V_risk, P_risk, pi_risk, V_i, A, k_g, lamb)
+            explicit_graph, C_maxs, succs_cache = expand_state_gubs_v2(
+            s, h_v, env, goal, explicit_graph, C, C_maxs, V_risk, P_risk, pi_risk, V_i, A, k_g, lamb, succs_cache)
         # print("Explicit graph after:", explicit_graph)
         # print()
         # print("Best partial solution graph before:", bpsg)

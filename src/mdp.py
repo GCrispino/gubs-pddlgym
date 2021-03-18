@@ -1036,25 +1036,30 @@ def lao_dual_criterion(s0,
         explicit_graph[s_]['solved'] = True
     return explicit_graph, bpsg, n_updates
 
-def lao_dual_criterion_reachable(s0, h_v, h_p, goal, A, lamb, env, epsilon=1e-3, eliminate_traps=False):
+def lao_dual_criterion_reachable(s0, h_v, h_p, goal, A, lamb, env, epsilon=1e-3, eliminate_traps=False, ilao=False):
     #all_reachable = mg.find_all_reachable(s0, mdp_obj)
     all_reachable = set({s0})
     explicit_graph = {}
 
     stack = [s0]
     n_updates_total = 0
+    succs_cache = {}
     while len(stack) > 0:
         s = stack.pop()
         if s in explicit_graph and explicit_graph[s]['solved']:
             continue
 
         print("Will call lao_dual_criterion for state:", utils.text_render(env, s))
-        if eliminate_traps:
-            explicit_graph, _, n_updates = lao_dual_criterion_fret(
-                s, h_v, h_p, goal, A, lamb, env, epsilon=epsilon, explicit_graph=explicit_graph)
+        if ilao:
+            explicit_graph, _, n_updates, succs_cache = ilao_dual_criterion_fret(
+                s, h_v, h_p, goal, A, lamb, env, epsilon=epsilon, explicit_graph=explicit_graph, succs_cache=succs_cache)
         else:
-            explicit_graph, _, n_updates = lao_dual_criterion(
-                s, h_v, h_p, goal, A, lamb, env, epsilon=epsilon, explicit_graph=explicit_graph)
+            if eliminate_traps:
+                explicit_graph, _, n_updates, succs_cache = lao_dual_criterion_fret(
+                    s, h_v, h_p, goal, A, lamb, env, epsilon=epsilon, explicit_graph=explicit_graph)
+            else:
+                explicit_graph, _, n_updates, succs_cache = lao_dual_criterion(
+                    s, h_v, h_p, goal, A, lamb, env, epsilon=epsilon, explicit_graph=explicit_graph)
         n_updates_total += n_updates
         print(' finished lao dual criterion for', utils.text_render(env, s), explicit_graph[s]['prob'], explicit_graph[s]['value'], len(
             [v for v in explicit_graph.values() if v['solved']]))

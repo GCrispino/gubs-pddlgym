@@ -783,12 +783,16 @@ def value_iteration_dual_criterion(explicit_graph,
         for s in Z:
             if explicit_graph[s]['solved']:
                 continue
-            #if not p_zero and explicit_graph[s]['prob'] < epsilon:
-            #    continue
-            A_blacklist = explicit_graph[s]['blacklist'] if 'blacklist' in explicit_graph[s] else set()
-            n_updates += 1
             all_reachable = np.array(
                 [find_reachable(s, a, explicit_graph) for a in A], dtype=object)
+            if explicit_graph[s]['pi']:
+                solved_succ = [explicit_graph[s_['state']]['solved'] for s_ in all_reachable[A_i[explicit_graph[s]['pi']]]]
+                if all(solved_succ):
+                    explicit_graph[s]['solved'] = True
+                    continue
+
+            A_blacklist = explicit_graph[s]['blacklist'] if 'blacklist' in explicit_graph[s] else set()
+            n_updates += 1
             actions_results_p = np.array([
                 np.sum([
                     P[V_i[s_['state']]] * s_['A'][a] for s_ in all_reachable[i]

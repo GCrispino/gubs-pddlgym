@@ -72,13 +72,20 @@ def tireworld_text_render(obs):
         {"Flat tire" if flattire else ""}
     """
 
-def river_alt_text_render(obs):
+def river_alt_get_location(obs):
     location = None
-    qualifiers = []
+
     for lit in obs.literals:
         if lit.predicate.name == 'robot-at':
             location = lit.variables[1]
             break
+
+    return location
+
+
+def river_alt_text_render(obs):
+    qualifiers = []
+    location = river_alt_get_location(obs)
     for lit in obs.literals:
         if lit.predicate.name != 'robot-at' and lit.predicate.name != 'conn' and lit.variables[0] == location:
             qualifiers.append(lit.predicate.name)

@@ -785,7 +785,7 @@ def value_iteration_dual_criterion(explicit_graph,
                 continue
             all_reachable = np.array(
                 [find_reachable(s, a, explicit_graph) for a in A], dtype=object)
-            if explicit_graph[s]['pi']:
+            if not p_zero and explicit_graph[s]['pi']:
                 solved_succ = [explicit_graph[s_['state']]['solved'] for s_ in all_reachable[A_i[explicit_graph[s]['pi']]]]
                 if all(solved_succ):
                     explicit_graph[s]['solved'] = True

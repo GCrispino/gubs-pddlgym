@@ -874,13 +874,14 @@ def lao_dual_criterion_fret(s0,
                        lamb,
                        env,
                        epsilon=1e-3,
-                       explicit_graph=None):
+                       explicit_graph=None,
+                       succs_cache=None):
     bpsg = {s0: {"Adj": []}}
     explicit_graph = explicit_graph or {}
-    succs_cache = {}
+    succs_cache = {} if succs_cache == None else succs_cache
 
     if s0 in explicit_graph and explicit_graph[s0]['solved']:
-        return explicit_graph, bpsg, 0
+        return explicit_graph, bpsg, 0, succs_cache
 
     if s0 not in explicit_graph:
         explicit_graph[s0] = {
@@ -958,7 +959,7 @@ def lao_dual_criterion_fret(s0,
             break
     for s_ in bpsg:
         explicit_graph[s_]['solved'] = True
-    return explicit_graph, bpsg, n_updates
+    return explicit_graph, bpsg, n_updates, succs_cache
 
 def lao_dual_criterion(s0,
                        h_v,

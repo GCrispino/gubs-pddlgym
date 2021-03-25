@@ -198,7 +198,7 @@ print('obtaining optimal policy')
 start = time.time()
 if args.algorithm_gubs == 'ao':
     explicit_graph, bpsg, explicit_graph_dc, C_maxs, n_updates, n_updates_dc, _ = mdp.egubs_ao(
-        obs, h_v, h_p, goal, A, args.k_g, args.lamb, env, args.epsilon, args.eliminate_traps, args.algorithm_dc == 'ilao')
+        obs, h_v, h_p, goal, A, args.k_g, args.lamb, env, args.epsilon, args.algorithm_dc == 'lao_eliminate_traps', args.algorithm_dc == 'ilao')
 
     C_max = int(C_maxs[obs])
     print("C_max:", C_max)

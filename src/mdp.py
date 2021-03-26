@@ -630,6 +630,8 @@ def eliminate_traps(bpsg, goal, A, explicit_graph, env, succs_cache):
         if not found_action:
             # permanent
             for s in trap:
+                if explicit_graph[s]['solved']:
+                    continue
                 explicit_graph[s]['value'] = 0
                 explicit_graph[s]['prob'] = 0
                 explicit_graph[s]['solved'] = True
@@ -662,6 +664,9 @@ def eliminate_traps(bpsg, goal, A, explicit_graph, env, succs_cache):
                         s_max_utility = trap_states[i_s]
 
             for s in trap:
+                # if state is solved, skip it
+                if explicit_graph[s]['solved']:
+                    continue
                 if 'blacklist' not in explicit_graph[s]:
                     explicit_graph[s]['blacklist'] = set()
                 blacklist = explicit_graph[s]['blacklist']

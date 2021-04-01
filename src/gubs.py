@@ -103,6 +103,8 @@ def get_X(V, V_i, lamb, S, succ_states, A, c=1):
 
     return X[X.T[1] < 0]
 
+def get_P_diff_W(s, a, P1, P2, V_i, k_g, succ_s):
+    return k_g * (np.sum(np.fromiter((p * P1[V_i[s_]] for s_, p in succ_s.items()), dtype=float)) - P2[V_i[s]])
 
 def get_cmax(V, V_i, P, S, succ_states, A, lamb, k_g, c=1):
     X = get_X(V, V_i, lamb, S, succ_states, A)
@@ -111,8 +113,9 @@ def get_cmax(V, V_i, P, S, succ_states, A, lamb, k_g, c=1):
     for i, ((s, a), x) in enumerate(X):
         #denominator = k_g * (np.sum(np.fromiter((s_['A'][a] * P[V_i[s_['name']]]
         #                                         for s_ in mdp.find_reachable(s, a, mdp_obj)), dtype=float)) - P[V_i[s]])
-        denominator = k_g * (np.sum(np.fromiter((p * P[V_i[s_]]
-                                                 for s_, p in succ_states[s, a].items()), dtype=float)) - P[V_i[s]])
+        #denominator = k_g * (np.sum(np.fromiter((p * P[V_i[s_]]
+        #                                         for s_, p in succ_states[s, a].items()), dtype=float)) - P[V_i[s]])
+        denominator = get_P_diff_W(s, a, P, P, V_i, k_g, succ_states[s, a])
         if denominator == 0:
             W[i] = -np.inf
         else:
@@ -238,13 +241,15 @@ def W(s, a, V_diff, V_i, P, k_g, lamb, succ_states):
 
     return W
 
-def can_improve(V, V_i, s, a, C, lamb, succ_states):
-    reachable = succ_states[s, a]
-
-    V_diff = V[V_i[s]] - np.sum(
+def get_V_diff_W(s, a, V1, V2, V_i, C, lamb, s_succ):
+    V_diff = V1[V_i[s]] - np.sum(
         np.fromiter(
-            (p * np.exp(lamb * C(s, a)) * V[V_i[s_]]
-             for s_, p in reachable.items()), dtype=float))
+            (p * np.exp(lamb * C(s, a)) * V2[V_i[s_]]
+             for s_, p in s_succ.items()), dtype=float))
+    return V_diff
+
+def can_improve(V, V_i, s, a, C, lamb, succ_states):
+    V_diff = get_V_diff_W(s, a, V, V, V_i, C, lamb, succ_states[s, a])
 
     return V_diff < 0, V_diff
 

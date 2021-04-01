@@ -918,12 +918,10 @@ def value_iteration_dual_criterion(explicit_graph,
                     continue
 
             A_blacklist = explicit_graph[s]['blacklist'] if 'blacklist' in explicit_graph[s] else set()
+
             n_updates += 1
-            actions_results_p = np.array([
-                np.sum([
-                    P[V_i[s_['state']]] * s_['A'][a] for s_ in all_reachable[i]
-                ]) for i, a in enumerate(A)
-            ])
+            actions_results_p, actions_results = get_actions_results(s, A, P, V, V_i, C, all_reachable, lamb)
+
             Q_p[V_i[s]] = actions_results_p
 
             # set maxprob
@@ -938,13 +936,6 @@ def value_iteration_dual_criterion(explicit_graph,
                 not_max_prob_actions_results) == 0 else np.max(
                     not_max_prob_actions_results)
 
-            actions_results = np.array([
-                np.sum([
-                    np.exp(lamb * C(s, A[i])) * V[V_i[s_['state']]] *
-                    s_['A'][a] for s_ in all_reachable[i]
-                #]) for i in i_A_max_prob
-                ]) for i, a in enumerate(A)
-            ])
             actions_results_max_prob = actions_results[i_A_max_prob]
             Q_v[V_i[s]] = actions_results
 
@@ -1064,18 +1055,11 @@ def value_iteration_cmax(explicit_graph,
 
             A_blacklist = explicit_graph[s]['blacklist'] if 'blacklist' in explicit_graph[s] else set()
             n_updates += 1
-            actions_results_p = np.array([
-                np.sum([
-                    P[V_i[s_['state']]] * s_['A'][a] for s_ in all_reachable[i]
-                ]) for i, a in enumerate(A)
-            ])
-            Q_p[V_i[s]] = actions_results_p
 
-            actions_results_p_l = np.array([
-                np.sum([
-                    P_L[V_i[s_['state']]] * s_['A'][a] for s_ in all_reachable[i]
-                ]) for i, a in enumerate(A)
-            ])
+            actions_results_p, actions_results = get_actions_results(s, A, P, V, V_i, C, all_reachable, lamb)
+            actions_results_p_l, actions_results_l = get_actions_results(s, A, P_L, V_L, V_i, C, all_reachable, lamb)
+
+            Q_p[V_i[s]] = actions_results_p
 
             # set maxprob
             max_prob = np.max([res for i, res in enumerate(actions_results_p) if A[i] not in A_blacklist])
@@ -1090,18 +1074,6 @@ def value_iteration_cmax(explicit_graph,
                 not_max_prob_actions_results) == 0 else np.max(
                     not_max_prob_actions_results)
 
-            actions_results = np.array([
-                np.sum([
-                    np.exp(lamb * C(s, A[i])) * V[V_i[s_['state']]] *
-                    s_['A'][a] for s_ in all_reachable[i]
-                ]) for i, a in enumerate(A)
-            ])
-            actions_results_l = np.array([
-                np.sum([
-                    np.exp(lamb * C(s, A[i])) * V_L[V_i[s_['state']]] *
-                    s_['A'][a] for s_ in all_reachable[i]
-                ]) for i, a in enumerate(A)
-            ])
             actions_results_max_prob = actions_results[i_A_max_prob]
             Q_v[V_i[s]] = actions_results
             actions_results_max_prob_l = actions_results_l[i_A_max_prob]
@@ -1115,14 +1087,8 @@ def value_iteration_cmax(explicit_graph,
             p_diff = np.zeros(n_actions)
             p_diff_l = np.zeros(n_actions)
             for i_a_, a in enumerate(A):
-                v_diff[i_a_] = V_[V_i[s]] - np.sum(
-                        np.fromiter(
-                            (p * np.exp(lamb * C(s, a)) * V_L[V_i[s_]]
-                             for s_, p in succ_states[s, a].items()), dtype=float))
-                v_diff_l[i_a_] = V_L_[V_i[s]] - np.sum(
-                        np.fromiter(
-                            (p * np.exp(lamb * C(s, a)) * V[V_i[s_]]
-                             for s_, p in succ_states[s, a].items()), dtype=float))
+                v_diff[i_a_] = gubs.get_V_diff_W(s, a, V_, V_L, V_i, C, lamb, succ_states[s, a])
+                v_diff_l[i_a_] = gubs.get_V_diff_W(s, a, V_L_, V, V_i, C, lamb, succ_states[s, a])
                 if v_diff_l[i_a_] >= 0:
                     W_[V_i[s], i_a_] = 0
                     #print('W is solved!')
@@ -1134,10 +1100,12 @@ def value_iteration_cmax(explicit_graph,
                     pi_cmax_[V_i[s]] = a
                     continue
 
-                p_diff[i_a_] = k_g * (np.sum(np.fromiter((p * P[V_i[s_]]
-                                                         for s_, p in succ_states[s, a].items()), dtype=float)) - P_L_[V_i[s]])
-                p_diff_l[i_a_] = k_g * (np.sum(np.fromiter((p * P_L[V_i[s_]]
-                                                         for s_, p in succ_states[s, a].items()), dtype=float)) - P_[V_i[s]])
+                p_diff[i_a_] = gubs.get_P_diff_W(s, a, P, P_L_, V_i, k_g, succ_states[s, a])
+                #p_diff[i_a_] = k_g * (np.sum(np.fromiter((p * P[V_i[s_]]
+                #                                         for s_, p in succ_states[s, a].items()), dtype=float)) - P_L_[V_i[s]])
+                p_diff_l[i_a_] = gubs.get_P_diff_W(s, a, P_L, P_, V_i, k_g, succ_states[s, a])
+                #p_diff_l[i_a_] = k_g * (np.sum(np.fromiter((p * P_L[V_i[s_]]
+                #                                         for s_, p in succ_states[s, a].items()), dtype=float)) - P_[V_i[s]])
 
                 if np.sign(v_diff[i_a_]) * np.sign(p_diff_l[i_a_]) == 1:
                     W_[V_i[s], i_a_] = -(1 / lamb) * np.log(v_diff[i_a_]/(k_g * p_diff_l[i_a_]))
@@ -1864,3 +1832,18 @@ def lao_cmax_fret(s0,
         explicit_graph[s_]['solved'] = True
     return explicit_graph, bpsg, n_updates, succs_cache
 
+def get_actions_results(s, A, P, V, V_i, C, all_reachable, lamb):
+    actions_results_p = np.array([
+        np.sum([
+            P[V_i[s_['state']]] * s_['A'][a] for s_ in all_reachable[i]
+        ]) for i, a in enumerate(A)
+    ])
+
+    actions_results = np.array([
+        np.sum([
+            np.exp(lamb * C(s, A[i])) * V[V_i[s_['state']]] *
+            s_['A'][a] for s_ in all_reachable[i]
+        ]) for i, a in enumerate(A)
+    ])
+
+    return actions_results_p, actions_results

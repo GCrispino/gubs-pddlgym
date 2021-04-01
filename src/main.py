@@ -72,7 +72,7 @@ def parse_args():
                         help="Algorithm to solve the dual criterion (default: %s)" % DEFAULT_ALGORITHM)
     parser.add_argument('--algorithm_gubs',
                         dest='algorithm_gubs',
-                        choices=['vi', 'ao', 'none'],
+                        choices=['vi', 'ao', 'ao-cmax-h', 'none'],
                         default=DEFAULT_ALGORITHM,
                         help="Algorithm to solve the eGUBS criterion (default: %s)" % DEFAULT_ALGORITHM)
     parser.add_argument(
@@ -208,6 +208,41 @@ if args.algorithm_gubs == 'ao':
     #print('Size explicit graph dc:', len(explicit_graph_dc))
     print('Result for initial state dc:', explicit_graph_dc[obs]['prob'], explicit_graph_dc[obs]['value'])
     print('Result for initial state:', explicit_graph[(obs, 0)]['prob'], explicit_graph[(obs, 0)]['value'], explicit_graph[(obs, 0)]['value'] + args.k_g * explicit_graph[(obs, 0)]['prob'])
+if args.algorithm_gubs == 'ao-cmax-h':
+    #explicit_graph, bpsg, explicit_graph_dc, C_maxs, n_updates, n_updates_dc, _ = mdp.egubs_ao(
+    #    obs, h_v, h_p, goal, A, args.k_g, args.lamb, env, args.epsilon, args.algorithm_dc == 'lao_eliminate_traps', args.algorithm_dc == 'ilao')
+
+    explicit_graph, bpsg, n_updates, succ_states = mdp.lao_cmax_fret(
+        obs, h_v, h_p, goal, A, args.lamb, args.k_g, env, args.epsilon)
+    pi_func = lambda s, C: explicit_graph[(s, C)]['pi'] if (s, C) in explicit_graph else explicit_graph_dc[s]['pi']
+    keep_cost = True
+    #print('Size explicit graph dc:', len(explicit_graph_dc))
+
+    explicit_graph_dc, n_updates_dc, succs_cache = mdp.lao_dual_criterion_reachable(
+        obs, h_v, h_p, goal, A, args.lamb, env, args.epsilon, args.eliminate_traps)
+
+    V_risk = {s: explicit_graph_dc[s]['value']
+              for s in explicit_graph_dc}
+    P_risk = {s: explicit_graph_dc[s]['prob']
+              for s in explicit_graph_dc}
+    pi_risk = {s: explicit_graph_dc[s]['pi']
+               for s in explicit_graph_dc}
+    V_i = {s: s for s in V_risk}
+
+    def C(s, a): return 0 if check_goal(s, goal) else 1
+
+    succ_states = {}
+    for s_ in explicit_graph_dc:
+        for s__ in explicit_graph_dc[s_]['Adj']:
+            for a, p in s__['A'].items():
+                if (s_, a) not in succ_states:
+                    succ_states[s_, a] = {}
+                if s__['state'] not in succ_states[s_, a]:
+                    succ_states[s_, a][s__['state']] = p
+    C_maxs = gubs.get_cmax_reachable(
+        obs, V_risk, V_i, P_risk, pi_risk, goal, A, C, args.lamb, args.k_g, succ_states)
+
+    print('Result for initial state cmax:', explicit_graph[obs]['c_max'], explicit_graph[obs]['c_max_l'], explicit_graph[obs]['W'], (explicit_graph[obs]['prob'],explicit_graph[obs]['prob_l']), (explicit_graph[obs]['value'], explicit_graph[obs]['value_l']) , explicit_graph[obs]['pi_cmax'])
 elif args.algorithm_dc == 'vi':
     print(' calculating list of states...')
     reach = mdp.get_all_reachable(obs, A, env)

@@ -80,6 +80,7 @@ def vi(S, succ_states, A, V_i, G_i, goal, env, gamma, epsilon):
 
 
 def expand_state_dual_criterion(s, h_v, h_p, env, explicit_graph, goal, A, p_zero=True, succs_cache=None):
+    succs_cache = {} if succs_cache == None else succs_cache
     if check_goal(s, goal):
         raise ValueError(
             f'State {s} can\'t be expanded because it is a goal state')
@@ -92,6 +93,7 @@ def expand_state_dual_criterion(s, h_v, h_p, env, explicit_graph, goal, A, p_zer
             succs = succs_cache[(s, a)]
         else:
             succs = get_successor_states_check_exception(s, a, env.domain)
+            succs_cache[(s, a)] = succs
         for s_, p in succs.items():
             if s_ not in neighbour_states_dict:
                 neighbour_states_dict[s_] = i
@@ -117,6 +119,15 @@ def expand_state_dual_criterion(s, h_v, h_p, env, explicit_graph, goal, A, p_zer
             h_v_ = 1 if is_goal else h_v(n['state'])
             h_p_ = 1 if is_goal else h_p(n['state'])
             new_explicit_graph[n['state']] = {
+                **({
+                    "c_max": np.inf,
+                    "c_max_a": np.full(len(A), np.inf),
+                    "c_max_l": np.zeros(len(A)),
+                    "W": np.full(len(A), np.inf),
+                    "pi_cmax": None,
+                    "value_l": 1 if is_goal else 0,
+                    "prob_l": 1 if is_goal else 0
+                } if "c_max" in explicit_graph[s] else {}),
                 "value": h_v_,
                 "prob": h_p_,
                 "solved": False,
@@ -281,35 +292,35 @@ def find_reachable(s, a, mdp):
 
 
 
-def find_direct_ancestors(s, graph, visited, best=False):
+def find_direct_ancestors(s, graph, visited, best=False, policy_key='pi'):
     return list(
         filter(
             lambda s_: s_ != s and (s_ not in visited) and len(
                 list(
                     filter(
                         lambda s__: s__['state'] == s and
-                        (True if not best else graph[s_]['pi'] in s__['A']
+                        (True if not best else graph[s_][policy_key] in s__['A']
                          ), graph[s_]['Adj']))) > 0, graph))
 
 
-def __find_ancestors(s, bpsg, visited, best):
+def __find_ancestors(s, bpsg, visited, best, policy_key='pi'):
     # Find states in graph that have 's' in the adjacent list (except from 's' itself and states that were already visited):
     direct_ancestors = list(
         filter(lambda a: a not in visited,
-               find_direct_ancestors(s, bpsg, visited, best)))
+               find_direct_ancestors(s, bpsg, visited, best, policy_key=policy_key)))
 
     result = [] + direct_ancestors
 
     for a in direct_ancestors:
         if a not in visited:
             visited.add(a)
-            result += __find_ancestors(a, bpsg, visited, best)
+            result += __find_ancestors(a, bpsg, visited, best, policy_key=policy_key)
 
     return result
 
 
-def find_ancestors(s, bpsg, best=False):
-    return __find_ancestors(s, bpsg, set(), best)
+def find_ancestors(s, bpsg, best=False, policy_key='pi'):
+    return __find_ancestors(s, bpsg, set(), best, policy_key=policy_key)
 
 def find_direct_ancestors_extended(s, graph, best=False):
     return list(filter(
@@ -444,7 +455,7 @@ def topological_sort(mdp):
     dfs(mdp, on_finish=dfs_fn)
     return list(reversed(stack))
 
-def update_action_partial_solution(s, s0, bpsg, explicit_graph):
+def update_action_partial_solution(s, s0, bpsg, explicit_graph, policy_key="pi"):
     """
         Updates partial solution given pair of state and action
     """
@@ -453,7 +464,7 @@ def update_action_partial_solution(s, s0, bpsg, explicit_graph):
     states = [s]
     while len(states) > 0:
         s = states.pop()
-        a = explicit_graph[s]['pi']
+        a = explicit_graph[s][policy_key]
         s_obj = bpsg_[s]
 
         s_obj['Adj'] = []
@@ -473,11 +484,11 @@ def update_action_partial_solution(s, s0, bpsg, explicit_graph):
     return bpsg_
 
 
-def update_partial_solution(s0, bpsg, explicit_graph):
+def update_partial_solution(s0, bpsg, explicit_graph, policy_key="pi"):
     bpsg_ = copy(bpsg)
 
     for s in bpsg:
-        a = explicit_graph[s]['pi']
+        a = explicit_graph[s][policy_key]
         if s not in bpsg_:
             continue
 
@@ -486,13 +497,13 @@ def update_partial_solution(s0, bpsg, explicit_graph):
         if len(s_obj['Adj']) == 0:
             if a is not None:
                 bpsg_ = update_action_partial_solution(s, s0, bpsg_,
-                                                       explicit_graph)
+                                                       explicit_graph, policy_key=policy_key)
         else:
             best_current_action = next(iter(s_obj['Adj'][0]['A'].keys()))
 
             if a is not None and best_current_action != a:
                 bpsg_ = update_action_partial_solution(s, s0, bpsg_,
-                                                       explicit_graph)
+                                                       explicit_graph, policy_key=policy_key)
 
     unreachable = find_unreachable(s0, bpsg_)
 
@@ -589,7 +600,7 @@ def is_trap(scc, sccs, goal, explicit_graph):
             break
     return is_trap
 
-def eliminate_traps(bpsg, goal, A, explicit_graph, env, succs_cache):
+def eliminate_traps(bpsg, goal, A, explicit_graph, env, succs_cache, policy_key='pi'):
     sccs = list(get_sccs(bpsg))
 
     # store scc index for each state in bpsg
@@ -634,11 +645,12 @@ def eliminate_traps(bpsg, goal, A, explicit_graph, env, succs_cache):
                     continue
                 explicit_graph[s]['value'] = 0
                 explicit_graph[s]['prob'] = 0
+                if 'c_max' in explicit_graph[s]:
+                    explicit_graph[s]['c_max'] = 0
                 explicit_graph[s]['solved'] = True
         else:
             # transient
             shape = len(trap), len(actions)
-            A_i = {a: i for i, a in enumerate(A)}
             Q_v = np.zeros(shape)
             Q_p = np.zeros(shape)
             trap_states = list(trap)
@@ -672,7 +684,116 @@ def eliminate_traps(bpsg, goal, A, explicit_graph, env, succs_cache):
                 blacklist = explicit_graph[s]['blacklist']
                 new_blacklisted = None
                 if s == s_max_utility:
-                    explicit_graph[s]['pi'] = a_max_utility
+                    explicit_graph[s][policy_key] = a_max_utility
+
+                    # blacklist actions that are not in actions set
+                    new_blacklisted = set(A) - actions
+                else:
+                    # blacklist actions that go to the same state
+                    new_blacklisted = set(A) - actions_diff_state
+                assert len(new_blacklisted) < len(A)
+                # mark as changed if blacklist set changes
+                if new_blacklisted and (new_blacklisted != blacklist):
+                    explicit_graph[s]['blacklist'] = new_blacklisted
+
+
+                explicit_graph[s]['value'] = max_utility
+                explicit_graph[s]['prob'] = max_prob
+
+    return bpsg, succs_cache
+
+# TODO - unfinished
+# - Account for maximum cmax instead of maxprob or max utility
+#   - Check if we already have c_max for each action
+# - Consider solved states as absorving when finding traps??
+def eliminate_traps_cmax(bpsg, goal, A, explicit_graph, env, succs_cache, policy_key='pi_cmax'):
+    sccs = list(get_sccs(bpsg))
+
+    # store scc index for each state in bpsg
+    for i, scc in enumerate(sccs):
+        for s in scc:
+            bpsg[s]['scc'] = i
+
+    traps = set(filter(lambda scc: is_trap(scc, sccs, goal, bpsg), sccs))
+
+    for i, trap in enumerate(traps):
+        # check if trap is transient or permanent
+        found_action = False
+        actions = set()
+        actions_diff_state = set()
+        for s in trap:
+            if not explicit_graph[s]['expanded']:
+                all_succs = set()
+                for a in A:
+                    succs = get_successor_states_check_exception(s, a, env.domain)
+                    if (s, a) not in succs_cache:
+                        succs_cache[(s, a)] = succs
+                    all_succs.update(set(succs))
+                    for s_ in succs:
+                        if s_ != s:
+                            actions_diff_state.add(a)
+                        if s_ not in trap:
+                            found_action = True
+                            actions.add(a)
+            else:
+                for adj in explicit_graph[s]['Adj']:
+                    s_ = adj['state']
+                    if s_ != s:
+                        actions_diff_state.update(set(adj['A']))
+                    if s_ not in trap:
+                        found_action = True
+                        actions.update(set(adj['A']))
+
+        if not found_action:
+            # permanent
+            for s in trap:
+                if explicit_graph[s]['solved']:
+                    continue
+                explicit_graph[s]['value'] = 0
+                explicit_graph[s]['prob'] = 0
+                if 'c_max' in explicit_graph[s]:
+                    explicit_graph[s]['c_max'] = 0
+                    explicit_graph[s]['c_max_a'][:] = 0
+                explicit_graph[s]['solved'] = True
+        else:
+            # transient
+            shape = len(trap), len(actions)
+            Q_v = np.zeros(shape)
+            Q_p = np.zeros(shape)
+            C_max_a = np.zeros(shape)
+            trap_states = list(trap)
+            action_list = list(actions)
+            for i, s in enumerate(trap_states):
+                for i_a, a in enumerate(action_list):
+                    Q_v[i][i_a] = explicit_graph[s]['Q_v'][a]
+                    Q_p[i][i_a] = explicit_graph[s]['Q_p'][a]
+                    C_max_a[i][i_a] = explicit_graph[s]['c_max_a'][i_a]
+            max_prob = np.max(Q_p)
+            i_max_prob = np.argwhere(Q_p == max_prob)
+            i_s_a_max_prob = {i: set() for i in set(i_max_prob.T[0])}
+            for i_s, i_a in i_max_prob:
+                i_s_a_max_prob[i_s].add(i_a)
+
+            max_utility = -np.inf
+            a_max_utility = None
+            s_max_utility = None
+            for i_s, i_a_set in i_s_a_max_prob.items():
+                for i_a in i_a_set:
+                    if Q_v[i_s, i_a] > max_utility:
+                        max_utility = Q_v[i_s, i_a]
+                        a_max_utility = action_list[i_a]
+                        s_max_utility = trap_states[i_s]
+
+            for s in trap:
+                # if state is solved, skip it
+                if explicit_graph[s]['solved']:
+                    continue
+                if 'blacklist' not in explicit_graph[s]:
+                    explicit_graph[s]['blacklist'] = set()
+                blacklist = explicit_graph[s]['blacklist']
+                new_blacklisted = None
+                if s == s_max_utility:
+                    explicit_graph[s][policy_key] = a_max_utility
 
                     # blacklist actions that are not in actions set
                     new_blacklisted = set(A) - actions
@@ -863,6 +984,267 @@ def value_iteration_dual_criterion(explicit_graph,
         explicit_graph[s]['value'] = V[V_i[s]]
         explicit_graph[s]['prob'] = P[V_i[s]]
         explicit_graph[s]['pi'] = pi[V_i[s]]
+
+        for a in A:
+            explicit_graph[s]['Q_v'][a] = Q_v[V_i[s], A_i[a]]
+            explicit_graph[s]['Q_p'][a] = Q_p[V_i[s], A_i[a]]
+
+    #print(f'{i} iterations')
+    return explicit_graph, converged, changed, n_updates
+
+def value_iteration_cmax(explicit_graph,
+                         bpsg,
+                         A,
+                         Z,
+                         goal,
+                         lamb,
+                         k_g,
+                         C,
+                         succ_states,
+                         epsilon=1e-3,
+                         convergence_test=False):
+    n_states = len(explicit_graph)
+    n_actions = len(A)
+
+    # initialize
+    V = np.zeros(n_states, dtype=float)
+    V_L = np.zeros(n_states, dtype=float)
+    W = np.zeros((n_states, n_actions), dtype=float)
+    W_L = np.zeros((n_states, n_actions), dtype=float)
+    C_max = np.zeros(n_states, dtype=float)
+    C_max_a = np.zeros((n_states, n_actions), dtype=float)
+    Q_v = np.zeros((n_states, n_actions), dtype=float)
+    Q_p = np.zeros((n_states, n_actions), dtype=float)
+    pi = np.full(n_states, None)
+    pi_cmax = np.full(n_states, None)
+    P = np.zeros(n_states, dtype=float)
+    P_L = np.zeros(n_states, dtype=float)
+    V_i = {s: i for i, s in enumerate(explicit_graph)}
+    A_i = {a: i for i, a in enumerate(A)}
+
+    for s, n in explicit_graph.items():
+        C_max[V_i[s]] = n['c_max']
+        W_L[V_i[s]] = n['c_max_l']
+        W[V_i[s]] = n['W']
+        V[V_i[s]] = n['value']
+        V_L[V_i[s]] = n['value_l']
+        P[V_i[s]] = n['prob']
+        P_L[V_i[s]] = n['prob_l']
+        pi[V_i[s]] = n['pi']
+        pi_cmax[V_i[s]] = n['pi_cmax']
+
+        for a in A:
+            Q_v[V_i[s], A_i[a]] = n['Q_v'][a]
+            Q_p[V_i[s], A_i[a]] = n['Q_p'][a]
+
+    i = 0
+
+    P_not_max_prob = np.copy(P)
+    C_max_ = np.copy(C_max)
+    C_max_a_ = np.copy(C_max_a)
+    V_ = np.copy(V)
+    V_L_ = np.copy(V_L)
+    W_ = np.copy(W)
+    W_L_ = np.copy(W_L)
+    P_ = np.copy(P)
+    P_L_ = np.copy(P_L)
+    pi_ = np.copy(pi)
+    pi_cmax_ = np.copy(pi_cmax)
+
+    changed = False
+    converged = False
+    n_updates = 0
+    np.seterr(all='raise')
+    while True:
+        for s in Z:
+            if explicit_graph[s]['solved']:
+                continue
+            all_reachable = np.array(
+                [find_reachable(s, a, explicit_graph) for a in A], dtype=object)
+
+            A_blacklist = explicit_graph[s]['blacklist'] if 'blacklist' in explicit_graph[s] else set()
+            n_updates += 1
+            actions_results_p = np.array([
+                np.sum([
+                    P[V_i[s_['state']]] * s_['A'][a] for s_ in all_reachable[i]
+                ]) for i, a in enumerate(A)
+            ])
+            Q_p[V_i[s]] = actions_results_p
+
+            actions_results_p_l = np.array([
+                np.sum([
+                    P_L[V_i[s_['state']]] * s_['A'][a] for s_ in all_reachable[i]
+                ]) for i, a in enumerate(A)
+            ])
+
+            # set maxprob
+            max_prob = np.max([res for i, res in enumerate(actions_results_p) if A[i] not in A_blacklist])
+            P_[V_i[s]] = max_prob
+            P_L_[V_i[s]] = np.max([res for i, res in enumerate(actions_results_p_l) if A[i] not in A_blacklist])
+            i_A_max_prob = np.array([i for i, res in enumerate(actions_results_p) if res == max_prob and A[i] not in A_blacklist])
+
+            A_max_prob = A[i_A_max_prob]
+            not_max_prob_actions_results = np.array([res for i, res in enumerate(actions_results_p) if A[i] not in A_blacklist])
+
+            P_not_max_prob[V_i[s]] = P[V_i[s]] if len(
+                not_max_prob_actions_results) == 0 else np.max(
+                    not_max_prob_actions_results)
+
+            actions_results = np.array([
+                np.sum([
+                    np.exp(lamb * C(s, A[i])) * V[V_i[s_['state']]] *
+                    s_['A'][a] for s_ in all_reachable[i]
+                ]) for i, a in enumerate(A)
+            ])
+            actions_results_l = np.array([
+                np.sum([
+                    np.exp(lamb * C(s, A[i])) * V_L[V_i[s_['state']]] *
+                    s_['A'][a] for s_ in all_reachable[i]
+                ]) for i, a in enumerate(A)
+            ])
+            actions_results_max_prob = actions_results[i_A_max_prob]
+            Q_v[V_i[s]] = actions_results
+            actions_results_max_prob_l = actions_results_l[i_A_max_prob]
+            i_a_opt = np.argmax(actions_results_max_prob)
+            a_opt = A_max_prob[i_a_opt]
+
+
+            # v_diff
+            v_diff = np.zeros(n_actions)
+            v_diff_l = np.zeros(n_actions)
+            p_diff = np.zeros(n_actions)
+            p_diff_l = np.zeros(n_actions)
+            for i_a_, a in enumerate(A):
+                v_diff[i_a_] = V_[V_i[s]] - np.sum(
+                        np.fromiter(
+                            (p * np.exp(lamb * C(s, a)) * V_L[V_i[s_]]
+                             for s_, p in succ_states[s, a].items()), dtype=float))
+                v_diff_l[i_a_] = V_L_[V_i[s]] - np.sum(
+                        np.fromiter(
+                            (p * np.exp(lamb * C(s, a)) * V[V_i[s_]]
+                             for s_, p in succ_states[s, a].items()), dtype=float))
+                if v_diff_l[i_a_] >= 0:
+                    W_[V_i[s], i_a_] = 0
+                    #print('W is solved!')
+                    # mark as solved?
+                    explicit_graph[s]['solved_w'] = True
+                    V_[V_i[s]] = actions_results_max_prob[i_a_opt]
+                    V_L_[V_i[s]] = actions_results_max_prob_l[i_a_opt]
+                    pi_[V_i[s]] = a_opt
+                    pi_cmax_[V_i[s]] = a
+                    continue
+
+                p_diff[i_a_] = k_g * (np.sum(np.fromiter((p * P[V_i[s_]]
+                                                         for s_, p in succ_states[s, a].items()), dtype=float)) - P_L_[V_i[s]])
+                p_diff_l[i_a_] = k_g * (np.sum(np.fromiter((p * P_L[V_i[s_]]
+                                                         for s_, p in succ_states[s, a].items()), dtype=float)) - P_[V_i[s]])
+
+                if np.sign(v_diff[i_a_]) * np.sign(p_diff_l[i_a_]) == 1:
+                    W_[V_i[s], i_a_] = -(1 / lamb) * np.log(v_diff[i_a_]/(k_g * p_diff_l[i_a_]))
+                    print('W set as', W_[V_i[s], i_a_])
+                    exit()
+                if np.sign(v_diff_l[i_a_]) * np.sign(p_diff[i_a_]) == 1:
+                    W_L_[V_i[s], i_a_] = -(1 / lamb) * np.log(v_diff_l[i_a_]/(k_g * p_diff[i_a_]))
+                    print('W_L set as', W_L_[V_i[s], i_a_])
+
+            W_s = np.max(W_[V_i[s]])
+            #print('W_[V_i[s]]:', W_[V_i[s]])
+            if W_s != np.inf and W_s != float('inf'):
+                print('W_s not inf:', W_s)
+            reachable_by_actions = {}
+            for i_a_, a in enumerate(A):
+                for s_ in all_reachable[i_a_]:
+                    if s_['state'] not in reachable_by_actions:
+                        reachable_by_actions[s_['state']] = set()
+                    reachable_by_actions[s_['state']].add(a)
+
+            # Updating W and C_max
+            s_max_diff = None
+            a_max_diff = None
+            C_max_s_   = None
+            C_max_diff_a = np.zeros(len(A))
+            # getting action that maximizes c_max
+            for s_, A_ in reachable_by_actions.items():
+                list_A_ = np.array(list(A_))
+                c_max_diffs = []
+                for a in list_A_:
+                    c_max_diff = C_max[V_i[s_]] - C(s, a)
+                    if c_max_diff > C_max_diff_a[A_i[a]]:
+                        C_max_diff_a[A_i[a]] = c_max_diff
+                    c_max_diffs.append(c_max_diff)
+
+                if s == s_:
+                    # don't examine the same state
+                    continue
+                #c_max_diffs = [C_max[V_i[s_]] - C(s, a) for a in list_A_]
+                max_diff = np.max(c_max_diffs)
+                i_as_max_diff = np.argwhere(c_max_diffs == max_diff).reshape(-1)
+                A_max_diff_ = list_A_[i_as_max_diff]
+                a_max_diff_s_ = None
+                if a_opt in A_max_diff_:
+                    a_max_diff_s_ = a_opt
+                if s_max_diff == None or max_diff > C_max_s_:
+                    s_max_diff = s_
+                    a_max_diff = a_max_diff_s_ if a_max_diff_s_ != None else list_A_[i_as_max_diff[0]]
+                    C_max_s_ = max_diff
+            print('tchau')
+            C_max_a_[V_i[s]] = C_max_diff_a
+
+            if W_s > C_max_s_:
+                a_best = None
+                C_max_[V_i[s]] = W_s
+            else:
+                a_best = a_max_diff
+                C_max_[V_i[s]] = C_max_s_
+            #i_a_best = [a for a in A if a == a_best][0]
+
+            V_[V_i[s]] = actions_results_max_prob[i_a_opt]
+            V_L_[V_i[s]] = actions_results_max_prob_l[i_a_opt]
+            pi_[V_i[s]] = a_opt
+            pi_cmax_[V_i[s]] = a_best
+
+        v_norm = np.linalg.norm(V_[list(V_i.values())] - V[list(V_i.values())],
+                                np.inf)
+        p_norm = np.linalg.norm(P_[list(V_i.values())] - P[list(V_i.values())],
+                                np.inf)
+
+        P_diff = P_[list(V_i.values())] - P_not_max_prob[list(V_i.values())]
+        arg_min_p_diff = np.argmin(P_diff)
+        min_p_diff = P_diff[arg_min_p_diff]
+
+        different_actions = pi_[list(
+            V_i.values())][pi_[list(V_i.values())] != pi[list(V_i.values())]]
+        if len(different_actions) > 0:
+            changed = True
+        if v_norm + p_norm < epsilon and min_p_diff >= 0:
+            converged = True
+        C_max = np.copy(C_max_)
+        C_max_a = np.copy(C_max_a_)
+        W = np.copy(W_)
+        W_L = np.copy(W_L_)
+        V = np.copy(V_)
+        P = np.copy(P_)
+        pi = np.copy(pi_)
+        pi_cmax = np.copy(pi_cmax_)
+
+        if converged:
+            print(
+                f'{convergence_test}, {changed}, {converged}, {v_norm}, {p_norm}, {min_p_diff}'
+            )
+            break
+
+        i += 1
+
+    # save results in explicit graph
+    for s in Z:
+        explicit_graph[s]['c_max'] = C_max[V_i[s]]
+        explicit_graph[s]['c_max_a'] = C_max_a[V_i[s]]
+        explicit_graph[s]['c_max_l'] = W_L[V_i[s]]
+        explicit_graph[s]['W'] = W[V_i[s]]
+        explicit_graph[s]['value'] = V[V_i[s]]
+        explicit_graph[s]['prob'] = P[V_i[s]]
+        explicit_graph[s]['pi'] = pi[V_i[s]]
+        explicit_graph[s]['pi_cmax'] = pi_cmax[V_i[s]]
 
         for a in A:
             explicit_graph[s]['Q_v'][a] = Q_v[V_i[s], A_i[a]]
@@ -1377,3 +1759,108 @@ def egubs_ao(s0, h_v, h_p, goal, A, k_g, lamb, env, epsilon=1e-3, eliminate_trap
         i += 1
 
     return explicit_graph, bpsg, explicit_graph_dc, C_maxs, n_updates, n_updates_dc, old_n_updates
+
+def lao_cmax_fret(s0,
+                  h_v,
+                  h_p,
+                  goal,
+                  A,
+                  lamb,
+                  k_g,
+                  env,
+                  epsilon=1e-3,
+                  explicit_graph=None,
+                  succs_cache=None):
+    bpsg = {s0: {"Adj": []}}
+    explicit_graph = explicit_graph or {}
+    succs_cache = {} if succs_cache == None else succs_cache
+
+    if s0 in explicit_graph and explicit_graph[s0]['solved']:
+        return explicit_graph, bpsg, 0, succs_cache
+
+    if s0 not in explicit_graph:
+        explicit_graph[s0] = {
+            "c_max": np.inf,
+            "c_max_a": np.full(len(A), np.inf),
+            "c_max_l": np.zeros(len(A)),
+            "W": np.full(len(A), np.inf),
+            "value": h_v(s0),
+            "value_l": 0,
+            "prob": h_p(s0),
+            "prob_l": 0,
+            "solved": False,
+            "expanded": False,
+            "pi": None,
+            "pi_cmax": None,
+            "Q_v": {a: h_v(s0) for a in A},
+            "Q_p": {a: h_p(s0) for a in A},
+            "Adj": []
+        }
+
+    def C(s, a):
+        return 0 if check_goal(s, goal) else 1
+
+    i = 1
+    unexpanded = get_unexpanded_states(goal, explicit_graph, bpsg)
+    n_updates = 0
+    explicit_graph_cur_size = 1
+    while True:
+        while len(unexpanded) > 0:
+            s = unexpanded[0]
+            print("Iteration", i)
+            print("Will expand", len(unexpanded), "states")
+            Z = set()
+            for s in unexpanded:
+                explicit_graph = expand_state_dual_criterion(
+                    s, h_v, h_p, env, explicit_graph, goal, A, p_zero=False, succs_cache=succs_cache)
+                Z.add(s)
+                Z.update(find_ancestors(s, explicit_graph, best=True, policy_key='pi_cmax'))
+
+            assert len(explicit_graph) >= explicit_graph_cur_size
+
+            explicit_graph_cur_size = len(explicit_graph)
+            print("explicit graph size:", explicit_graph_cur_size)
+            print("Z size:", len(Z))
+            explicit_graph, _, __, n_updates_ = value_iteration_cmax(
+                explicit_graph, bpsg, A, Z, goal, lamb, k_g, C, succs_cache, epsilon=epsilon)
+            print(f"Finished value iteration in {n_updates_} updates")
+            n_updates += n_updates_
+            bpsg = update_partial_solution(s0, bpsg, explicit_graph, policy_key='pi_cmax')
+
+            bpsg, succs_cache = eliminate_traps_cmax(bpsg, goal, A, explicit_graph, env, succs_cache, policy_key='pi_cmax')
+
+            bpsg = update_partial_solution(s0, bpsg, explicit_graph, policy_key='pi_cmax')
+
+            unexpanded = get_unexpanded_states(goal, explicit_graph, bpsg)
+            i += 1
+        bpsg_states = [s_ for s_ in bpsg.keys() if not check_goal(s_, goal)]
+        print(f"Will start convergence test for bpsg with {len(bpsg)} states")
+        explicit_graph, converged, changed, n_updates_ = value_iteration_cmax(
+            explicit_graph,
+            bpsg,
+            A,
+            bpsg_states,
+            goal,
+            lamb,
+            k_g,
+            C,
+            succs_cache,
+            epsilon=epsilon,
+            convergence_test=True)
+        n_updates += n_updates_
+
+        bpsg = update_partial_solution(s0, bpsg, explicit_graph, policy_key='pi_cmax')
+        bpsg, succs_cache = eliminate_traps_cmax(bpsg, goal, A, explicit_graph, env, succs_cache, policy_key='pi_cmax')
+
+        bpsg = update_partial_solution(s0, bpsg, explicit_graph, policy_key='pi_cmax')
+        unexpanded = get_unexpanded_states(goal, explicit_graph, bpsg)
+
+        if changed:
+            continue
+
+        if converged and len(unexpanded) == 0:
+            break
+    for s_ in bpsg:
+        explicit_graph[s_]['solved'] = True
+    return explicit_graph, bpsg, n_updates, succs_cache
+

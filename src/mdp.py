@@ -659,12 +659,15 @@ def eliminate_traps(bpsg, goal, A, explicit_graph, env, succs_cache, policy_key=
                 for i_a, a in enumerate(action_list):
                     Q_v[i][i_a] = explicit_graph[s]['Q_v'][a]
                     Q_p[i][i_a] = explicit_graph[s]['Q_p'][a]
+
+            # Get maxprob
             max_prob = np.max(Q_p)
             i_max_prob = np.argwhere(Q_p == max_prob)
             i_s_a_max_prob = {i: set() for i in set(i_max_prob.T[0])}
             for i_s, i_a in i_max_prob:
                 i_s_a_max_prob[i_s].add(i_a)
 
+            # Get max utility
             max_utility = -np.inf
             a_max_utility = None
             s_max_utility = None
@@ -706,7 +709,7 @@ def eliminate_traps(bpsg, goal, A, explicit_graph, env, succs_cache, policy_key=
 # - Account for maximum cmax instead of maxprob or max utility
 #   - Check if we already have c_max for each action
 # - Consider solved states as absorving when finding traps??
-def eliminate_traps_cmax(bpsg, goal, A, explicit_graph, env, succs_cache, policy_key='pi_cmax'):
+def eliminate_traps_cmax(bpsg, goal, A, A_i, explicit_graph, env, succs_cache, policy_key='pi_cmax'):
     sccs = list(get_sccs(bpsg))
 
     # store scc index for each state in bpsg
@@ -767,13 +770,15 @@ def eliminate_traps_cmax(bpsg, goal, A, explicit_graph, env, succs_cache, policy
                 for i_a, a in enumerate(action_list):
                     Q_v[i][i_a] = explicit_graph[s]['Q_v'][a]
                     Q_p[i][i_a] = explicit_graph[s]['Q_p'][a]
-                    C_max_a[i][i_a] = explicit_graph[s]['c_max_a'][i_a]
+                    C_max_a[i][i_a] = explicit_graph[s]['c_max_a'][A_i[a]]
             max_prob = np.max(Q_p)
             i_max_prob = np.argwhere(Q_p == max_prob)
             i_s_a_max_prob = {i: set() for i in set(i_max_prob.T[0])}
+            # Get maxprob
             for i_s, i_a in i_max_prob:
                 i_s_a_max_prob[i_s].add(i_a)
 
+            # Get max utility
             max_utility = -np.inf
             a_max_utility = None
             s_max_utility = None
@@ -784,6 +789,20 @@ def eliminate_traps_cmax(bpsg, goal, A, explicit_graph, env, succs_cache, policy
                         a_max_utility = action_list[i_a]
                         s_max_utility = trap_states[i_s]
 
+            # Get max c_max
+            max_cmax = -np.inf
+            a_max_cmax = None
+            s_max_cmax = None
+            for i_s, i_a_set in i_s_a_max_prob.items():
+                for i_a in i_a_set:
+                    if C_max_a[i_s, i_a] > max_cmax:
+                        max_utility = C_max_a[i_s, i_a]
+                        a_max_cmax = action_list[i_a]
+                        s_max_cmax = trap_states[i_s]
+            # TODO
+            # Obter max c_max_a igual o max utility
+            # Substituir todo mundo aqui embaixo onde tem max_utility por max_cmax_a
+
             for s in trap:
                 # if state is solved, skip it
                 if explicit_graph[s]['solved']:
@@ -792,8 +811,8 @@ def eliminate_traps_cmax(bpsg, goal, A, explicit_graph, env, succs_cache, policy
                     explicit_graph[s]['blacklist'] = set()
                 blacklist = explicit_graph[s]['blacklist']
                 new_blacklisted = None
-                if s == s_max_utility:
-                    explicit_graph[s][policy_key] = a_max_utility
+                if s == s_max_cmax:
+                    explicit_graph[s][policy_key] = a_max_cmax
 
                     # blacklist actions that are not in actions set
                     new_blacklisted = set(A) - actions
@@ -807,6 +826,7 @@ def eliminate_traps_cmax(bpsg, goal, A, explicit_graph, env, succs_cache, policy
 
 
                 explicit_graph[s]['value'] = max_utility
+                explicit_graph[s]['c_max'] = max_cmax
                 explicit_graph[s]['prob'] = max_prob
 
     return bpsg, succs_cache
@@ -923,22 +943,22 @@ def value_iteration_dual_criterion(explicit_graph,
             actions_results_p, actions_results = get_actions_results(s, A, P, V, V_i, C, all_reachable, lamb)
 
             Q_p[V_i[s]] = actions_results_p
+            Q_v[V_i[s]] = actions_results
 
             # set maxprob
             max_prob = np.max([res for i, res in enumerate(actions_results_p) if A[i] not in A_blacklist])
-            P_[V_i[s]] = max_prob
             i_A_max_prob = np.array([i for i, res in enumerate(actions_results_p) if res == max_prob and A[i] not in A_blacklist])
 
             A_max_prob = A[i_A_max_prob]
             not_max_prob_actions_results = np.array([res for i, res in enumerate(actions_results_p) if A[i] not in A_blacklist])
 
+
+            actions_results_max_prob = actions_results[i_A_max_prob]
+
+            P_[V_i[s]] = max_prob
             P_not_max_prob[V_i[s]] = P[V_i[s]] if len(
                 not_max_prob_actions_results) == 0 else np.max(
                     not_max_prob_actions_results)
-
-            actions_results_max_prob = actions_results[i_A_max_prob]
-            Q_v[V_i[s]] = actions_results
-
             i_a = np.argmax(actions_results_max_prob)
             V_[V_i[s]] = actions_results_max_prob[i_a]
             pi_[V_i[s]] = A_max_prob[i_a]
@@ -1101,11 +1121,7 @@ def value_iteration_cmax(explicit_graph,
                     continue
 
                 p_diff[i_a_] = gubs.get_P_diff_W(s, a, P, P_L_, V_i, k_g, succ_states[s, a])
-                #p_diff[i_a_] = k_g * (np.sum(np.fromiter((p * P[V_i[s_]]
-                #                                         for s_, p in succ_states[s, a].items()), dtype=float)) - P_L_[V_i[s]])
                 p_diff_l[i_a_] = gubs.get_P_diff_W(s, a, P_L, P_, V_i, k_g, succ_states[s, a])
-                #p_diff_l[i_a_] = k_g * (np.sum(np.fromiter((p * P_L[V_i[s_]]
-                #                                         for s_, p in succ_states[s, a].items()), dtype=float)) - P_[V_i[s]])
 
                 if np.sign(v_diff[i_a_]) * np.sign(p_diff_l[i_a_]) == 1:
                     W_[V_i[s], i_a_] = -(1 / lamb) * np.log(v_diff[i_a_]/(k_g * p_diff_l[i_a_]))
@@ -1768,6 +1784,8 @@ def lao_cmax_fret(s0,
     def C(s, a):
         return 0 if check_goal(s, goal) else 1
 
+    A_i = {a: i for i, a in enumerate(A)}
+
     i = 1
     unexpanded = get_unexpanded_states(goal, explicit_graph, bpsg)
     n_updates = 0
@@ -1795,7 +1813,7 @@ def lao_cmax_fret(s0,
             n_updates += n_updates_
             bpsg = update_partial_solution(s0, bpsg, explicit_graph, policy_key='pi_cmax')
 
-            bpsg, succs_cache = eliminate_traps_cmax(bpsg, goal, A, explicit_graph, env, succs_cache, policy_key='pi_cmax')
+            bpsg, succs_cache = eliminate_traps_cmax(bpsg, goal, A, A_i, explicit_graph, env, succs_cache, policy_key='pi_cmax')
 
             bpsg = update_partial_solution(s0, bpsg, explicit_graph, policy_key='pi_cmax')
 
@@ -1818,7 +1836,7 @@ def lao_cmax_fret(s0,
         n_updates += n_updates_
 
         bpsg = update_partial_solution(s0, bpsg, explicit_graph, policy_key='pi_cmax')
-        bpsg, succs_cache = eliminate_traps_cmax(bpsg, goal, A, explicit_graph, env, succs_cache, policy_key='pi_cmax')
+        bpsg, succs_cache = eliminate_traps_cmax(bpsg, goal, A, A_i, explicit_graph, env, succs_cache, policy_key='pi_cmax')
 
         bpsg = update_partial_solution(s0, bpsg, explicit_graph, policy_key='pi_cmax')
         unexpanded = get_unexpanded_states(goal, explicit_graph, bpsg)

@@ -112,7 +112,7 @@ def expand_state_dual_criterion(s, h_v, h_p, env, explicit_graph, goal, A, p_zer
     new_explicit_graph[s]["Adj"].extend(neighbour_states)
 
     for n in unexpanded_neighbours:
-        if n['state'] != s:
+        if n['state'] != s and n['state'] not in new_explicit_graph:
             is_goal = check_goal(n['state'], goal)
             h_v_ = 1 if is_goal else h_v(n['state'])
             h_p_ = 1 if is_goal else h_p(n['state'])

@@ -1113,9 +1113,9 @@ class TestMDPGraph(unittest.TestCase):
     def test_unexpanded_states_extended_v2(self):
         # Expand states '1' and '2':
         pi_risk_ = {S_gridworld[i]: a for i, a in enumerate(pi_risk_gridworld)}
-        explicit_, C_maxs_ = mdp.expand_state_gubs_v2(
+        explicit_, C_maxs_, _ = mdp.expand_state_gubs_v2(
             (s1_gridworld, 0), h_1, env_test_domain_gridworld, goal_test_domain_gridworld, explicit_graph_extended, C_test_domain_gridworld, C_maxs, V_risk_gridworld, P_risk_gridworld, pi_risk_, V_i_gridworld, A_gridworld, k_g, lamb)
-        explicit_, _ = mdp.expand_state_gubs_v2(
+        explicit_, *_ = mdp.expand_state_gubs_v2(
             (s2_gridworld, 1), h_1, env_test_domain_gridworld, goal_test_domain_gridworld, explicit_, C_test_domain_gridworld, C_maxs_, V_risk_gridworld, P_risk_gridworld, pi_risk_, V_i_gridworld, A_gridworld, k_g, lamb)
 
         unexpanded = mdp.get_unexpanded_states_extended(

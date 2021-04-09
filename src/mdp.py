@@ -84,6 +84,7 @@ def expand_state_dual_criterion(s, h_v, h_p, env, explicit_graph, goal, A, p_zer
         raise ValueError(
             f'State {s} can\'t be expanded because it is a goal state')
 
+    succs_cache = {} if succs_cache == None else succs_cache
     neighbour_states_dict = {}
     neighbour_states = []
     i = 0
@@ -189,6 +190,7 @@ def expand_state_gubs_v2(s, h, env, goal, explicit_graph, C, C_maxs, V_risk, P_r
         raise ValueError(
             f'State {s[0]} can\'t be expanded because it is a goal state')
 
+    succs_cache = {} if succs_cache == None else succs_cache
     # Get 's' neighbour states that were not expanded
     #    and "collapse" equal (s, C) pairs
     neighbour_states_dict = {}

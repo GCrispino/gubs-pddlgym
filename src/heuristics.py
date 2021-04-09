@@ -127,16 +127,13 @@ def tireworld_h_v(env, obs, lamb, shortest_path):
     if has_flattire and location not in spares:
         return 0
     else:
-        graph = tireworld_h_p_data(env)
-        p = tireworld_h_p(env, obs, graph)
         sp = shortest_path[location]
 
         return np.exp(lamb * sp)
 
 def river_h_v(env, obs, lamb, data):
-    shortest_path, ny = data
+    shortest_path, _ = data
     waterfall_locs = set(chain(*utils.get_values(obs.literals, 'is-waterfall')))
-    river_locs = set(chain(*utils.get_values(obs.literals, 'is-river')))
 
     location = utils.get_values(obs.literals, 'robot-at')[0][1]
 

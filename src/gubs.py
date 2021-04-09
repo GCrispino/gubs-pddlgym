@@ -111,10 +111,6 @@ def get_cmax(V, V_i, P, S, succ_states, A, lamb, k_g, c=1):
     W = np.zeros(len(X))
 
     for i, ((s, a), x) in enumerate(X):
-        #denominator = k_g * (np.sum(np.fromiter((s_['A'][a] * P[V_i[s_['name']]]
-        #                                         for s_ in mdp.find_reachable(s, a, mdp_obj)), dtype=float)) - P[V_i[s]])
-        #denominator = k_g * (np.sum(np.fromiter((p * P[V_i[s_]]
-        #                                         for s_, p in succ_states[s, a].items()), dtype=float)) - P[V_i[s]])
         denominator = get_P_diff_W(s, a, P, P, V_i, k_g, succ_states[s, a])
         if denominator == 0:
             W[i] = -np.inf

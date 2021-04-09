@@ -120,10 +120,10 @@ def expand_state_dual_criterion(s, h_v, h_p, env, explicit_graph, goal, A, p_zer
             h_p_ = 1 if is_goal else h_p(n['state'])
             new_explicit_graph[n['state']] = {
                 **({
-                    "c_max": np.inf,
-                    "c_max_a": np.full(len(A), np.inf),
+                    "c_max": 0 if is_goal else np.inf,
+                    "c_max_a": np.full(len(A), 0 if is_goal else np.inf),
                     "c_max_l": np.zeros(len(A)),
-                    "W": np.full(len(A), np.inf),
+                    "W": np.full(len(A), 0 if is_goal else np.inf),
                     "pi_cmax": None,
                     "value_l": 1 if is_goal else 0,
                     "prob_l": 1 if is_goal else 0
@@ -790,13 +790,13 @@ def eliminate_traps_cmax(bpsg, goal, A, A_i, explicit_graph, env, succs_cache, p
                         s_max_utility = trap_states[i_s]
 
             # Get max c_max
-            max_cmax = -np.inf
+            max_cmax = 0
             a_max_cmax = None
             s_max_cmax = None
             for i_s, i_a_set in i_s_a_max_prob.items():
                 for i_a in i_a_set:
                     if C_max_a[i_s, i_a] > max_cmax:
-                        max_utility = C_max_a[i_s, i_a]
+                        max_cmax = C_max_a[i_s, i_a]
                         a_max_cmax = action_list[i_a]
                         s_max_cmax = trap_states[i_s]
             # TODO
@@ -825,7 +825,7 @@ def eliminate_traps_cmax(bpsg, goal, A, A_i, explicit_graph, env, succs_cache, p
                     explicit_graph[s]['blacklist'] = new_blacklisted
 
 
-                explicit_graph[s]['value'] = max_utility
+                #explicit_graph[s]['value'] = max_utility
                 explicit_graph[s]['c_max'] = max_cmax
                 explicit_graph[s]['prob'] = max_prob
 
@@ -1100,6 +1100,10 @@ def value_iteration_cmax(explicit_graph,
             i_a_opt = np.argmax(actions_results_max_prob)
             a_opt = A_max_prob[i_a_opt]
 
+            V_[V_i[s]] = actions_results_max_prob[i_a_opt]
+            V_L_[V_i[s]] = actions_results_max_prob_l[i_a_opt]
+            pi_[V_i[s]] = a_opt
+
 
             # v_diff
             v_diff = np.zeros(n_actions)
@@ -1107,34 +1111,28 @@ def value_iteration_cmax(explicit_graph,
             p_diff = np.zeros(n_actions)
             p_diff_l = np.zeros(n_actions)
             for i_a_, a in enumerate(A):
-                v_diff[i_a_] = gubs.get_V_diff_W(s, a, V_, V_L, V_i, C, lamb, succ_states[s, a])
-                v_diff_l[i_a_] = gubs.get_V_diff_W(s, a, V_L_, V, V_i, C, lamb, succ_states[s, a])
+                v_diff[i_a_] = gubs.get_V_diff_W(s, a, V_, V_L_, V_i, C, lamb, succ_states[s, a])
+                v_diff_l[i_a_] = gubs.get_V_diff_W(s, a, V_L_, V_, V_i, C, lamb, succ_states[s, a])
                 if v_diff_l[i_a_] >= 0:
                     W_[V_i[s], i_a_] = 0
-                    #print('W is solved!')
-                    # mark as solved?
                     explicit_graph[s]['solved_w'] = True
-                    V_[V_i[s]] = actions_results_max_prob[i_a_opt]
-                    V_L_[V_i[s]] = actions_results_max_prob_l[i_a_opt]
-                    pi_[V_i[s]] = a_opt
-                    pi_cmax_[V_i[s]] = a
                     continue
+                if v_diff[i_a_] < 0:
 
-                p_diff[i_a_] = gubs.get_P_diff_W(s, a, P, P_L_, V_i, k_g, succ_states[s, a])
-                p_diff_l[i_a_] = gubs.get_P_diff_W(s, a, P_L, P_, V_i, k_g, succ_states[s, a])
+                    p_diff[i_a_] = gubs.get_P_diff_W(s, a, P_, P_L_, V_i, k_g, succ_states[s, a])
+                    p_diff_l[i_a_] = gubs.get_P_diff_W(s, a, P_L_, P_, V_i, k_g, succ_states[s, a])
 
-                if np.sign(v_diff[i_a_]) * np.sign(p_diff_l[i_a_]) == 1:
-                    W_[V_i[s], i_a_] = -(1 / lamb) * np.log(v_diff[i_a_]/(k_g * p_diff_l[i_a_]))
-                    print('W set as', W_[V_i[s], i_a_])
-                    exit()
-                if np.sign(v_diff_l[i_a_]) * np.sign(p_diff[i_a_]) == 1:
-                    W_L_[V_i[s], i_a_] = -(1 / lamb) * np.log(v_diff_l[i_a_]/(k_g * p_diff[i_a_]))
-                    print('W_L set as', W_L_[V_i[s], i_a_])
+                    if np.sign(v_diff[i_a_]) * np.sign(p_diff_l[i_a_]) == 1:
+                        W_[V_i[s], i_a_] = -(1 / lamb) * np.log(v_diff[i_a_]/p_diff_l[i_a_])
+                        print('W set as', W_[V_i[s], i_a_])
+                    if np.sign(v_diff_l[i_a_]) * np.sign(p_diff[i_a_]) == 1:
+                        W_L_[V_i[s], i_a_] = max(0, -(1 / lamb) * np.log(v_diff_l[i_a_]/p_diff[i_a_]))
+                        print('W_L set as', W_L_[V_i[s], i_a_])
 
             W_s = np.max(W_[V_i[s]])
             #print('W_[V_i[s]]:', W_[V_i[s]])
             if W_s != np.inf and W_s != float('inf'):
-                print('W_s not inf:', W_s)
+                print('W_s not inf:', W_s, W_[V_i[s]], utils.river_alt_text_render(s))
             reachable_by_actions = {}
             for i_a_, a in enumerate(A):
                 for s_ in all_reachable[i_a_]:
@@ -1164,14 +1162,15 @@ def value_iteration_cmax(explicit_graph,
                 max_diff = np.max(c_max_diffs)
                 i_as_max_diff = np.argwhere(c_max_diffs == max_diff).reshape(-1)
                 A_max_diff_ = list_A_[i_as_max_diff]
-                a_max_diff_s_ = None
                 if a_opt in A_max_diff_:
-                    a_max_diff_s_ = a_opt
+                    s_max_diff = s_
+                    a_max_diff = a_opt
+                    C_max_s_ = max_diff
+                    continue
                 if s_max_diff == None or max_diff > C_max_s_:
                     s_max_diff = s_
-                    a_max_diff = a_max_diff_s_ if a_max_diff_s_ != None else list_A_[i_as_max_diff[0]]
+                    a_max_diff = list_A_[i_as_max_diff[0]]
                     C_max_s_ = max_diff
-            print('tchau')
             C_max_a_[V_i[s]] = C_max_diff_a
 
             if W_s > C_max_s_:
@@ -1182,15 +1181,18 @@ def value_iteration_cmax(explicit_graph,
                 C_max_[V_i[s]] = C_max_s_
             #i_a_best = [a for a in A if a == a_best][0]
 
-            V_[V_i[s]] = actions_results_max_prob[i_a_opt]
-            V_L_[V_i[s]] = actions_results_max_prob_l[i_a_opt]
-            pi_[V_i[s]] = a_opt
             pi_cmax_[V_i[s]] = a_best
 
-        v_norm = np.linalg.norm(V_[list(V_i.values())] - V[list(V_i.values())],
+        v_norm_u = np.linalg.norm(V_[list(V_i.values())] - V[list(V_i.values())],
                                 np.inf)
-        p_norm = np.linalg.norm(P_[list(V_i.values())] - P[list(V_i.values())],
+        v_norm_l = np.linalg.norm(V_L_[list(V_i.values())] - V_L[list(V_i.values())],
                                 np.inf)
+        v_norm = v_norm_u + v_norm_l
+        p_norm_u = np.linalg.norm(P_[list(V_i.values())] - P[list(V_i.values())],
+                                np.inf)
+        p_norm_l = np.linalg.norm(P_L_[list(V_i.values())] - P_L[list(V_i.values())],
+                                np.inf)
+        p_norm = p_norm_u + p_norm_l
 
         P_diff = P_[list(V_i.values())] - P_not_max_prob[list(V_i.values())]
         arg_min_p_diff = np.argmin(P_diff)
@@ -1207,7 +1209,9 @@ def value_iteration_cmax(explicit_graph,
         W = np.copy(W_)
         W_L = np.copy(W_L_)
         V = np.copy(V_)
+        V_L = np.copy(V_L_)
         P = np.copy(P_)
+        P_L = np.copy(P_L_)
         pi = np.copy(pi_)
         pi_cmax = np.copy(pi_cmax_)
 
@@ -1226,7 +1230,8 @@ def value_iteration_cmax(explicit_graph,
         explicit_graph[s]['c_max_l'] = W_L[V_i[s]]
         explicit_graph[s]['W'] = W[V_i[s]]
         explicit_graph[s]['value'] = V[V_i[s]]
-        explicit_graph[s]['prob'] = P[V_i[s]]
+        explicit_graph[s]['value_l'] = V_L[V_i[s]]
+        explicit_graph[s]['prob_l'] = P_L[V_i[s]]
         explicit_graph[s]['pi'] = pi[V_i[s]]
         explicit_graph[s]['pi_cmax'] = pi_cmax[V_i[s]]
 
@@ -1846,6 +1851,9 @@ def lao_cmax_fret(s0,
 
         if converged and len(unexpanded) == 0:
             break
+            #pass
+        #if not any([explicit_graph[s_]['c_max'] == np.inf for s_ in bpsg]):
+        #    break
     for s_ in bpsg:
         explicit_graph[s_]['solved'] = True
     return explicit_graph, bpsg, n_updates, succs_cache

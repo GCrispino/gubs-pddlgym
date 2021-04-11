@@ -977,12 +977,14 @@ def lao_dual_criterion(s0,
                        env,
                        epsilon=1e-3,
                        p_zero=True,
-                       explicit_graph=None):
+                       explicit_graph=None,
+                       succs_cache=None):
     bpsg = {s0: {"Adj": []}}
     explicit_graph = explicit_graph or {}
+    succs_cache = {} if succs_cache == None else succs_cache
 
     if s0 in explicit_graph and explicit_graph[s0]['solved']:
-        return explicit_graph, bpsg, 0
+        return explicit_graph, bpsg, 0, succs_cache
 
     if s0 not in explicit_graph:
         explicit_graph[s0] = {
@@ -1012,7 +1014,7 @@ def lao_dual_criterion(s0,
             Z = set()
             for s in unexpanded:
                 explicit_graph = expand_state_dual_criterion(
-                    s, h_v, h_p, env, explicit_graph, goal, A)
+                    s, h_v, h_p, env, explicit_graph, goal, A, succs_cache=succs_cache)
                 Z.add(s)
                 Z.update(find_ancestors(s, explicit_graph, best=True))
             #Z = [s] + find_ancestors(s, explicit_graph, best=True)
@@ -1050,7 +1052,7 @@ def lao_dual_criterion(s0,
             break
     for s_ in bpsg:
         explicit_graph[s_]['solved'] = True
-    return explicit_graph, bpsg, n_updates
+    return explicit_graph, bpsg, n_updates, succs_cache
 
 def lao_dual_criterion_reachable(s0, h_v, h_p, goal, A, lamb, env, epsilon=1e-3, eliminate_traps=False, ilao=False):
     #all_reachable = mg.find_all_reachable(s0, mdp_obj)

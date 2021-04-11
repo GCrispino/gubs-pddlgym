@@ -251,13 +251,13 @@ elif args.algorithm_dc == 'vi':
 
 elif args.algorithm_dc == 'lao' or args.algorithm_dc == 'lao_eliminate_traps' or args.algorithm_dc == 'ilao':
     if args.algorithm_dc == 'lao_eliminate_traps':
-        explicit_graph, bpsg, n_updates = mdp.lao_dual_criterion_fret(
+        explicit_graph, bpsg, n_updates, _ = mdp.lao_dual_criterion_fret(
             obs, h_v, h_p, goal, A, args.lamb, env, args.epsilon)
     elif args.algorithm_dc == 'lao':
-        explicit_graph, bpsg, n_updates = mdp.lao_dual_criterion(
+        explicit_graph, bpsg, n_updates, _ = mdp.lao_dual_criterion(
             obs, h_v, h_p, goal, A, args.lamb, env, args.epsilon, not args.not_p_zero)
     elif args.algorithm_dc == 'ilao':
-        explicit_graph, bpsg, n_updates = mdp.ilao_dual_criterion_fret(
+        explicit_graph, bpsg, n_updates, _ = mdp.ilao_dual_criterion_fret(
             obs, h_v, h_p, goal, A, args.lamb, env, args.epsilon)
 
     pi_func = lambda s: explicit_graph[s]['pi']

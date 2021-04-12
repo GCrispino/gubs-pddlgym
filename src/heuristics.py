@@ -165,6 +165,19 @@ def river_h_p(env, obs, data):
     p = 1 - (0.4 ** (ny - (y_coord + 1)))
     return p
 
+def expblocks_h_v(env, obs, lamb, data):
+    goal_lits = set(obs.goal.literals)
+
+    h_empty_lits = utils.get_literals_by_name(obs.literals, 'handempty')
+    on_lits = utils.get_literals_by_name(obs.literals, 'on')
+    ontable_lits = utils.get_literals_by_name(obs.literals, 'ontable')
+    clear_lits = utils.get_literals_by_name(obs.literals, 'clear')
+    all_lits = set({*h_empty_lits, *on_lits, *ontable_lits, *clear_lits})
+
+    n_not_matched_goal_literals = len(set((lit for lit in goal_lits if lit not in all_lits)))
+
+    return np.exp(n_not_matched_goal_literals * lamb)
+
 value_heuristic_data_functions = {
     "PDDLEnvTireworld-v0": tireworld_shortest_path,
     "PDDLEnvRiver-alt-v0": river_data
@@ -177,7 +190,8 @@ prob_heuristic_data_functions = {
 
 value_heuristic_functions = {
     "PDDLEnvTireworld-v0": tireworld_h_v,
-    "PDDLEnvRiver-alt-v0": river_h_v
+    "PDDLEnvRiver-alt-v0": river_h_v,
+    "PDDLEnvExplodingblocks-v0": expblocks_h_v
 }
 
 prob_heuristic_functions = {

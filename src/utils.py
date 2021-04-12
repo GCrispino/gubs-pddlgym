@@ -20,6 +20,9 @@ def get_values(obs, name):
 def get_objects_by_name(objs, name):
     return [obj for obj in objs if str(obj).split(':')[1] == name]
 
+def get_literals_by_name(s, name):
+    return frozenset((lit for lit in s if lit.predicate.name == name))
+
 def get_literals_that_start_with(s, pattern):
     return frozenset((lit for lit in s if lit.predicate.name.startswith(pattern)))
 

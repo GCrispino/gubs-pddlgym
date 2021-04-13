@@ -1076,7 +1076,7 @@ def lao_dual_criterion_reachable(s0, h_v, h_p, goal, A, lamb, env, epsilon=1e-3,
                 explicit_graph, _, n_updates, succs_cache = lao_dual_criterion_fret(
                     s, h_v, h_p, goal, A, lamb, env, epsilon=epsilon, explicit_graph=explicit_graph)
             else:
-                explicit_graph, _, n_updates = lao_dual_criterion(
+                explicit_graph, _, n_updates, succs_cache = lao_dual_criterion(
                     s, h_v, h_p, goal, A, lamb, env, epsilon=epsilon, explicit_graph=explicit_graph)
         n_updates_total += n_updates
         print(' finished lao dual criterion for', utils.text_render(env, s), explicit_graph[s]['prob'], explicit_graph[s]['value'], len(

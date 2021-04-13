@@ -692,7 +692,7 @@ def eliminate_traps(bpsg, goal, A, explicit_graph, env, succs_cache):
 
     return bpsg, succs_cache
 
-def backup_dual_criterion(explicit_graph,
+def backup_prob(explicit_graph,
                           A,
                           s,
                           goal,
@@ -716,22 +716,10 @@ def backup_dual_criterion(explicit_graph,
 
     A_max_prob = A[i_A_max_prob]
 
-    actions_results = np.array([
-        np.sum([
-            np.exp(lamb * C(s, A[i])) * explicit_graph[s_['state']]['value'] *
-            s_['A'][a] for s_ in all_reachable[i]
-        ]) for i, a in enumerate(A)
-    ])
-    actions_results_max_prob = actions_results[i_A_max_prob]
-
     for i, a in enumerate(A):
-        explicit_graph[s]['Q_v'][a] = actions_results[i]
         explicit_graph[s]['Q_p'][a] = actions_results_p[i]
 
-    i_a = np.argmax(actions_results_max_prob)
-    explicit_graph[s]['value'] = actions_results_max_prob[i_a]
-    explicit_graph[s]['pi'] = A_max_prob[i_a]
-
+    explicit_graph[s]['pi'] = A_max_prob[0]
 
     return explicit_graph
 
@@ -1231,7 +1219,7 @@ def ilao_dual_criterion_fret(s0,
                         s, h_v, h_p, env, explicit_graph, goal, A, p_zero=False, succs_cache=succs_cache)
                 if not is_goal and not explicit_graph[s]['solved']:
                     # run bellman backup
-                    explicit_graph = backup_dual_criterion(explicit_graph, A, s, goal, lamb, C)
+                    explicit_graph = backup_prob(explicit_graph, A, s, goal, lamb, C)
                     n_updates_ += 1
             dfs(bpsg, on_visit=visit)
 

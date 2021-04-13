@@ -5,6 +5,7 @@ import utils
 import numpy as np
 from pddlgym.core import get_successor_states, InvalidAction
 from pddlgym.inference import check_goal
+from numba import jit
 
 def add_state_graph(s, graph, to_str=False, add_expanded_prop=False):
     graph_ = copy(graph)
@@ -704,9 +705,9 @@ def backup_dual_criterion(explicit_graph,
     all_reachable = np.array(
         [find_reachable(s, a, explicit_graph) for a in A], dtype=object)
     actions_results_p = np.array([
-        np.sum([
-            explicit_graph[s_['state']]['prob'] * s_['A'][a] for s_ in all_reachable[i]
-        ]) for i, a in enumerate(A)
+        sum_(np.array([
+            compute_prob(explicit_graph[s_['state']]['prob'], s_['A'][a]) for s_ in all_reachable[i]
+        ])) for i, a in enumerate(A)
     ])
 
     # set maxprob
@@ -735,6 +736,17 @@ def backup_dual_criterion(explicit_graph,
 
     return explicit_graph
 
+@jit(nopython=True)
+def sum_(a):
+    return np.sum(a)
+
+@jit(nopython=True)
+def compute_state_value(v, p, c, lamb):
+    return np.exp(lamb * c) * v * p
+
+@jit(nopython=True)
+def compute_prob(p, p_):
+    return p * p_
 
 def value_iteration_dual_criterion(explicit_graph,
                                    bpsg,
@@ -801,9 +813,9 @@ def value_iteration_dual_criterion(explicit_graph,
             A_blacklist = explicit_graph[s]['blacklist'] if 'blacklist' in explicit_graph[s] else set()
             n_updates += 1
             actions_results_p = np.array([
-                np.sum([
-                    P[V_i[s_['state']]] * s_['A'][a] for s_ in all_reachable[i]
-                ]) for i, a in enumerate(A)
+                sum_(np.array([
+                    compute_prob(P[V_i[s_['state']]], s_['A'][a]) for s_ in all_reachable[i]
+                ])) for i, a in enumerate(A)
             ])
             Q_p[V_i[s]] = actions_results_p
 
@@ -820,11 +832,12 @@ def value_iteration_dual_criterion(explicit_graph,
                     not_max_prob_actions_results)
 
             actions_results = np.array([
-                np.sum([
-                    np.exp(lamb * C(s, A[i])) * V[V_i[s_['state']]] *
-                    s_['A'][a] for s_ in all_reachable[i]
+                sum_(np.array([
+                    compute_state_value(V[V_i[s_['state']]], s_['A'][a], C(s, A[i]), lamb) for s_ in all_reachable[i]
+                    #np.exp(lamb * C(s, A[i])) * V[V_i[s_['state']]] *
+                    #s_['A'][a] for s_ in all_reachable[i]
                 #]) for i in i_A_max_prob
-                ]) for i, a in enumerate(A)
+                ])) for i, a in enumerate(A)
             ])
             actions_results_max_prob = actions_results[i_A_max_prob]
             Q_v[V_i[s]] = actions_results
@@ -1125,8 +1138,6 @@ def value_iteration_gubs(explicit_graph, V_i, A, Z, k_g, lamb, C, env):
                 np.sum(np.fromiter(gen_q, dtype=np.float))
 
             # Get probability
-            #gen_p = (s_['A'][a] * explicit_graph[(s_['name'], c_)]['prob']
-            #         for s_ in reachable)
             gen_p = (s_['A'][a] * explicit_graph[s_['state']]['prob']
                      for s_ in reachable)
             p_actions_results[i_a] = np.sum(

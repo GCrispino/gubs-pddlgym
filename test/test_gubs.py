@@ -43,14 +43,15 @@ base_literals = frozenset({
 river_0_states = utils.create_states_from_base_literals(
     base_literals, [
         frozenset({robot_at_predicate('robot0', obj.name)}) for obj in river_0_location_objs
-    ], problem)
+    ], problem, only_literals=True)
+
 init_river_0, _ = env_river.reset()
 A_river_0 = np.array(
             list(env_river.action_space.all_ground_literals(init_river_0)))
 
 
 reach_river_0 = mdp.get_all_reachable(init_river_0, A_river_0, env_river)
-S_river_0 = list(sorted([s for s in reach_river_0], key = lambda s: tuple(reversed(utils.get_coord_from_state(s)))))
+S_river_0 = list(sorted([s for s in reach_river_0], key = lambda s: tuple(reversed(utils.get_coord_from_state(utils.from_literals(s))))))
 V_i_river_0 = {s: i for i, s in enumerate(S_river_0)}
 succ_states_river_0 = {s: {} for s in reach_river_0}
 for s in reach_river_0:
@@ -83,12 +84,12 @@ river_1_location_objs = sorted(
 river_1_states = utils.create_states_from_base_literals(
     base_literals, [
         frozenset({robot_at_predicate('robot0', obj.name)}) for obj in river_1_location_objs
-    ], problem)
+    ], problem, only_literals=True)
 init_river_1, _ = env_river.reset()
 A_river_1 = np.array(
             list(env_river.action_space.all_ground_literals(init_river_1)))
 reach_river_1 = mdp.get_all_reachable(init_river_1, A_river_1, env_river)
-S_river_1 = list(sorted([s for s in reach_river_1], key = lambda s: tuple(reversed(utils.get_coord_from_state(s)))))
+S_river_1 = list(sorted([s for s in reach_river_1], key = lambda s: tuple(reversed(utils.get_coord_from_state(utils.from_literals(s))))))
 V_i_river_1 = {s: i for i, s in enumerate(S_river_1)}
 succ_states_river_1 = {s: {} for s in reach_river_1}
 for s in reach_river_1:
@@ -160,7 +161,9 @@ pi_risk_river_5x8 = {
 }
 
 def C_factory(goal):
-    def C(s, a): return 0 if check_goal(s, goal) else 1
+    def C(s, a):
+        s = utils.from_literals(s) if type(s) == frozenset else s
+        return 0 if check_goal(s, goal) else 1
     return C
 
 
@@ -169,7 +172,7 @@ class TestGUBS(unittest.TestCase):
         """
             River 4x4 problem, s0 = '9'
         """
-        s0 = init_river_0
+        s0 = init_river_0.literals
         lamb = -0.5
         k_g = 0.01
         C = C_factory(goal_river_0)
@@ -198,7 +201,7 @@ class TestGUBS(unittest.TestCase):
         """
             River 5x8 problem, s0 = '7'
         """
-        s0 = init_river_1
+        s0 = init_river_1.literals
         lamb = -0.1
         k_g = 1
         C = C_factory(goal_river_1)

@@ -29,13 +29,13 @@ def get_successor_states_check_exception(s, a, domain, return_probs=True):
 def get_all_reachable(s, A, env, reach=None):
     reach = {} if not reach else reach
 
-    reach[s] = {}
+    reach[s.literals] = {}
     for a in A:
         succ = get_successor_states_check_exception(s, a, env.domain)
 
-        reach[s][a] = {s_: prob for s_, prob in succ.items()}
+        reach[s.literals][a] = {s_.literals: prob for s_, prob in succ.items()}
         for s_ in succ:
-            if s_ not in reach:
+            if s_.literals not in reach:
                 reach.update(get_all_reachable(s_, A, env, reach))
     return reach
 
@@ -81,7 +81,7 @@ def vi(S, succ_states, A, V_i, G_i, goal, env, gamma, epsilon):
 
 
 def expand_state_dual_criterion(s, h_v, h_p, env, explicit_graph, goal, A, p_zero=True, succs_cache=None):
-    if check_goal(s, goal):
+    if check_goal(utils.from_literals(s), goal):
         raise ValueError(
             f'State {s} can\'t be expanded because it is a goal state')
 
@@ -93,14 +93,14 @@ def expand_state_dual_criterion(s, h_v, h_p, env, explicit_graph, goal, A, p_zer
         if succs_cache and (s, a) in succs_cache:
             succs = succs_cache[(s, a)]
         else:
-            succs = get_successor_states_check_exception(s, a, env.domain)
+            succs = get_successor_states_check_exception(utils.from_literals(s), a, env.domain)
         for s_, p in succs.items():
-            if s_ not in neighbour_states_dict:
-                neighbour_states_dict[s_] = i
+            if s_.literals not in neighbour_states_dict:
+                neighbour_states_dict[s_.literals] = i
                 i += 1
-                neighbour_states.append({'state': s_, 'A': {a: p}})
+                neighbour_states.append({'state': s_.literals, 'A': {a: p}})
             else:
-                neighbour_states[neighbour_states_dict[s_]]['A'][a] = p
+                neighbour_states[neighbour_states_dict[s_.literals]]['A'][a] = p
 
     unexpanded_neighbours = filter(
         lambda _s: (not _s['state'] in explicit_graph) or (not explicit_graph[_s['state']]['expanded']), neighbour_states)
@@ -115,7 +115,7 @@ def expand_state_dual_criterion(s, h_v, h_p, env, explicit_graph, goal, A, p_zer
 
     for n in unexpanded_neighbours:
         if n['state'] != s and n['state'] not in new_explicit_graph:
-            is_goal = check_goal(n['state'], goal)
+            is_goal = check_goal(utils.from_literals(n['state']), goal)
             h_v_ = 1 if is_goal else h_v(n['state'])
             h_p_ = 1 if is_goal else h_p(n['state'])
             new_explicit_graph[n['state']] = {
@@ -187,7 +187,8 @@ def expand_state_gubs(s, env, goal, explicit_graph, C, C_maxs, V_risk, P_risk, p
     return new_explicit_graph
 
 def expand_state_gubs_v2(s, h, env, goal, explicit_graph, C, C_maxs, V_risk, P_risk, pi_risk, V_i, A, k_g, lamb, succs_cache=None):
-    if check_goal(s[0], goal):
+    s_literals = utils.from_literals(s[0])
+    if check_goal(s_literals, goal):
         raise ValueError(
             f'State {s[0]} can\'t be expanded because it is a goal state')
 
@@ -202,16 +203,16 @@ def expand_state_gubs_v2(s, h, env, goal, explicit_graph, C, C_maxs, V_risk, P_r
         if succs_cache and (s[0], a) in succs_cache:
             succs = succs_cache[(s[0], a)]
         else:
-            succs = get_successor_states_check_exception(s[0], a, env.domain)
+            succs = get_successor_states_check_exception(s_literals, a, env.domain)
             succs_cache[(s[0], a)] = succs
         for s_, p in succs.items():
-            c_ = s[1] + C(s_, a)
-            if (s_, c_) not in neighbour_states_dict:
-                neighbour_states_dict[(s_, c_)] = i
+            c_ = s[1] + C(s_.literals, a)
+            if (s_.literals, c_) not in neighbour_states_dict:
+                neighbour_states_dict[(s_.literals, c_)] = i
                 i += 1
-                neighbour_states.append({'state': (s_, c_), 'A': {a: p}})
+                neighbour_states.append({'state': (s_.literals, c_), 'A': {a: p}})
             else:
-                neighbour_states[neighbour_states_dict[(s_, c_)]]['A'][a] = p
+                neighbour_states[neighbour_states_dict[(s_.literals, c_)]]['A'][a] = p
 
 
     unexpanded_neighbours = list(filter(
@@ -240,7 +241,7 @@ def expand_state_gubs_v2(s, h, env, goal, explicit_graph, C, C_maxs, V_risk, P_r
         else:
             c_max_n = C_maxs[n[0]]
 
-        solved = bool(check_goal(n[0], goal) or n[1] >= c_max_n)
+        solved = bool(check_goal(utils.from_literals(n[0]), goal) or n[1] >= c_max_n)
         value = V_risk[V_i[n[0]]] if solved else h(n[0])
         prob = P_risk[V_i[n[0]]]
         pi = pi_risk[n[0]] if solved else None
@@ -266,12 +267,12 @@ def get_unexpanded_states(goal, explicit_graph, bpsg):
     return list(
         filter(
             lambda x: (x not in explicit_graph) or (not explicit_graph[x]["expanded"] and not check_goal(
-                x, goal)), bpsg.keys()))
+                utils.from_literals(x) if type(x) == frozenset else x, goal)), bpsg.keys()))
 
 def get_unexpanded_states_extended(goal, explicit_graph, bpsg):
     return list(
         filter(lambda x: x in explicit_graph and not explicit_graph[x]['expanded'] and not explicit_graph[x]["solved"]
-               and not check_goal(x[0], goal), bpsg.keys())
+               and not check_goal(utils.from_literals(x[0]), goal), bpsg.keys())
     )
 
 def find_reachable(s, a, mdp):
@@ -581,7 +582,7 @@ def is_trap(scc, sccs, goal, explicit_graph):
 
     is_trap = True
     for s in scc:
-        if check_goal(s, goal):
+        if check_goal(utils.from_literals(s), goal):
             is_trap = False
         for adj in explicit_graph[s]['Adj']:
             s_ = adj['state']
@@ -611,7 +612,7 @@ def eliminate_traps(bpsg, goal, A, explicit_graph, env, succs_cache):
             if not explicit_graph[s]['expanded']:
                 all_succs = set()
                 for a in A:
-                    succs = get_successor_states_check_exception(s, a, env.domain)
+                    succs = get_successor_states_check_exception(utils.from_literals(s), a, env.domain)
                     if (s, a) not in succs_cache:
                         succs_cache[(s, a)] = succs
                     all_succs.update(set(succs))
@@ -761,7 +762,7 @@ def value_iteration_dual_criterion(explicit_graph,
 
     if p_zero:
         for s in Z:
-            if not check_goal(s, goal) and not explicit_graph[s]['solved'] and explicit_graph[s]['expanded']:
+            if not check_goal(utils.from_literals(s), goal) and not explicit_graph[s]['solved'] and explicit_graph[s]['expanded']:
                 explicit_graph[s]['prob'] = 0
                 for a in A:
                     explicit_graph[s]['Q_p'][a] = 0
@@ -904,6 +905,7 @@ def lao_dual_criterion_fret(s0,
         }
 
     def C(s, a):
+        s = utils.from_literals(s) if type(s) == frozenset else s
         return 0 if check_goal(s, goal) else 1
 
     i = 1
@@ -939,7 +941,7 @@ def lao_dual_criterion_fret(s0,
 
             unexpanded = get_unexpanded_states(goal, explicit_graph, bpsg)
             i += 1
-        bpsg_states = [s_ for s_ in bpsg.keys() if not check_goal(s_, goal)]
+        bpsg_states = [s_ for s_ in bpsg.keys() if not check_goal(utils.from_literals(s_), goal)]
         print(f"Will start convergence test for bpsg with {len(bpsg)} states")
         explicit_graph, converged, changed, n_updates_ = value_iteration_dual_criterion(
             explicit_graph,
@@ -1000,6 +1002,7 @@ def lao_dual_criterion(s0,
         }
 
     def C(s, a):
+        s = utils.from_literals(s) if type(s) == frozenset else s
         return 0 if check_goal(s, goal) else 1
 
     i = 1
@@ -1030,7 +1033,7 @@ def lao_dual_criterion(s0,
             bpsg = update_partial_solution(s0, bpsg, explicit_graph)
             unexpanded = get_unexpanded_states(goal, explicit_graph, bpsg)
             i += 1
-        bpsg_states = [s_ for s_ in bpsg.keys() if not check_goal(s_, goal)]
+        bpsg_states = [s_ for s_ in bpsg.keys() if not check_goal(utils.from_literals(s_), goal)]
         print(f"Will start convergence test for bpsg with {len(bpsg)} states")
         explicit_graph, converged, changed, n_updates_ = value_iteration_dual_criterion(
             explicit_graph,
@@ -1068,7 +1071,7 @@ def lao_dual_criterion_reachable(s0, h_v, h_p, goal, A, lamb, env, epsilon=1e-3,
         if s in explicit_graph and explicit_graph[s]['solved']:
             continue
 
-        print("Will call lao_dual_criterion for state:", utils.text_render(env, s))
+        print("Will call lao_dual_criterion for state:", utils.text_render(env, utils.from_literals(s)))
         if ilao:
             explicit_graph, _, n_updates, succs_cache = ilao_dual_criterion_fret(
                 s, h_v, h_p, goal, A, lamb, env, epsilon=epsilon, explicit_graph=explicit_graph, succs_cache=succs_cache)
@@ -1080,7 +1083,7 @@ def lao_dual_criterion_reachable(s0, h_v, h_p, goal, A, lamb, env, epsilon=1e-3,
                 explicit_graph, _, n_updates, succs_cache = lao_dual_criterion(
                     s, h_v, h_p, goal, A, lamb, env, epsilon=epsilon, explicit_graph=explicit_graph)
         n_updates_total += n_updates
-        print(' finished lao dual criterion for', utils.text_render(env, s), explicit_graph[s]['prob'], explicit_graph[s]['value'], len(
+        print(' finished lao dual criterion for', utils.text_render(env, utils.from_literals(s)), explicit_graph[s]['prob'], explicit_graph[s]['value'], len(
             [v for v in explicit_graph.values() if v['solved']]))
         for s_ in explicit_graph:
             if s_ not in all_reachable:
@@ -1156,7 +1159,7 @@ def value_iteration_gubs(explicit_graph, V_i, A, Z, k_g, lamb, C, env):
             changed = True
 
         if is_solved:
-            print(f"{utils.text_render(env, s[0])} with cost {s[1]} is now solved!")
+            print(f"{utils.text_render(env, utils.from_literals(s[0]))} with cost {s[1]} is now solved!")
         explicit_graph[s]['solved'] = is_solved
 
         if explicit_graph[s]['value'] < old_val or is_solved:
@@ -1209,6 +1212,7 @@ def ilao_dual_criterion_fret(s0,
         }
 
     def C(s, a):
+        s = utils.from_literals(s) if type(s) == frozenset else s
         return 0 if check_goal(s, goal) else 1
 
     i = 1
@@ -1224,7 +1228,7 @@ def ilao_dual_criterion_fret(s0,
             n_updates_ = 0
             def visit(s, i, d, low):
                 nonlocal explicit_graph, A, goal, n_updates_
-                is_goal = check_goal(s, goal)
+                is_goal = check_goal(utils.from_literals(s), goal)
                 if not is_goal and not explicit_graph[s]['expanded']:
                     explicit_graph = expand_state_dual_criterion(
                         s, h_v, h_p, env, explicit_graph, goal, A, p_zero=False, succs_cache=succs_cache)
@@ -1248,7 +1252,7 @@ def ilao_dual_criterion_fret(s0,
 
             unexpanded = get_unexpanded_states(goal, explicit_graph, bpsg)
             i += 1
-        bpsg_states = [s_ for s_ in bpsg.keys() if not check_goal(s_, goal)]
+        bpsg_states = [s_ for s_ in bpsg.keys() if not check_goal(utils.from_literals(s_), goal)]
         print(f"Will start convergence test for bpsg with {len(bpsg)} states")
         explicit_graph, converged, changed, n_updates_ = value_iteration_dual_criterion(
             explicit_graph,
@@ -1291,7 +1295,9 @@ def egubs_ao(s0, h_v, h_p, goal, A, k_g, lamb, env, epsilon=1e-3, eliminate_trap
                for s in explicit_graph_dc}
     V_i = {s: s for s in V_risk}
 
-    def C(s, a): return 0 if check_goal(s, goal) else 1
+    def C(s, a):
+        s = utils.from_literals(s) if type(s) == frozenset else s
+        return 0 if check_goal(s, goal) else 1
 
     succ_states = {}
     for s_ in explicit_graph_dc:
@@ -1343,7 +1349,7 @@ def egubs_ao(s0, h_v, h_p, goal, A, k_g, lamb, env, epsilon=1e-3, eliminate_trap
         #print("Unexpanded states:", unexpanded)
 
         s = unexpanded[0]
-        print("Will expand", utils.text_render(env, s[0]), " with cost", s[1])
+        print("Will expand", utils.text_render(env, utils.from_literals(s[0])), " with cost", s[1])
         print()
         # input()
         # print("Explicit graph before:", explicit_graph)

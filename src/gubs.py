@@ -7,8 +7,8 @@ from pddlgym.inference import check_goal
 def dual_criterion(lamb, V_i, S, h_v, goal, succ_states, A, c=1, epsilon=1e-3, n_iter=None):
     def u(c): return np.exp(lamb * c)
 
-    G_i = [V_i[s] for s in V_i if check_goal(s, goal)]
-    not_goal = [s for s in S if not check_goal(s, goal)]
+    G_i = [V_i[s] for s in V_i if check_goal(utils.from_literals(s), goal)]
+    not_goal = [s for s in S if not check_goal(utils.from_literals(s), goal)]
     n_states = len(S)
 
     # initialize
@@ -103,16 +103,15 @@ def get_X(V, V_i, lamb, S, succ_states, A, c=1):
 
     return X[X.T[1] < 0]
 
+def get_P_diff_W(s, a, P1, P2, V_i, k_g, succ_s):
+    return k_g * (np.sum(np.fromiter((p * P1[V_i[s_]] for s_, p in succ_s.items()), dtype=float)) - P2[V_i[s]])
 
 def get_cmax(V, V_i, P, S, succ_states, A, lamb, k_g, c=1):
     X = get_X(V, V_i, lamb, S, succ_states, A)
     W = np.zeros(len(X))
 
     for i, ((s, a), x) in enumerate(X):
-        #denominator = k_g * (np.sum(np.fromiter((s_['A'][a] * P[V_i[s_['name']]]
-        #                                         for s_ in mdp.find_reachable(s, a, mdp_obj)), dtype=float)) - P[V_i[s]])
-        denominator = k_g * (np.sum(np.fromiter((p * P[V_i[s_]]
-                                                 for s_, p in succ_states[s, a].items()), dtype=float)) - P[V_i[s]])
+        denominator = get_P_diff_W(s, a, P, P, V_i, k_g, succ_states[s, a])
         if denominator == 0:
             W[i] = -np.inf
         else:
@@ -159,7 +158,7 @@ def get_cmax_all(V, V_i, P, S, A, lamb, k_g, succ_states, c=1):
 
 
 def egubs_vi(V_dual, P_dual, pi_dual, C_max, lamb, k_g, V_i, S, goal, succ_states, A, c=1):
-    G_i = [V_i[s] for s in V_i if check_goal(s, goal)]
+    G_i = [V_i[s] for s in V_i if check_goal(utils.from_literals(s), goal)]
     n_states = len(S)
     n_actions = len(A)
 
@@ -187,7 +186,7 @@ def egubs_vi(V_dual, P_dual, pi_dual, C_max, lamb, k_g, V_i, S, goal, succ_state
             n_updates += 1
             for i_a, a in enumerate(A):
                 #c__ = 0 if mdp_obj[s]['goal'] else c
-                c__ = 0 if check_goal(s, goal) else c
+                c__ = 0 if check_goal(utils.from_literals(s), goal) else c
                 c_ = C + c__
                 successors = succ_states[s, a]
 
@@ -238,18 +237,20 @@ def W(s, a, V_diff, V_i, P, k_g, lamb, succ_states):
 
     return W
 
-def can_improve(V, V_i, s, a, C, lamb, succ_states):
-    reachable = succ_states[s, a]
-
-    V_diff = V[V_i[s]] - np.sum(
+def get_V_diff_W(s, a, V1, V2, V_i, C, lamb, s_succ):
+    V_diff = V1[V_i[s]] - np.sum(
         np.fromiter(
-            (p * np.exp(lamb * C(s, a)) * V[V_i[s_]]
-             for s_, p in reachable.items()), dtype=float))
+            (p * np.exp(lamb * C(s, a)) * V2[V_i[s_]]
+             for s_, p in s_succ.items()), dtype=float))
+    return V_diff
+
+def can_improve(V, V_i, s, a, C, lamb, succ_states):
+    V_diff = get_V_diff_W(s, a, V, V, V_i, C, lamb, succ_states[s, a])
 
     return V_diff < 0, V_diff
 
 def get_w_reachable(s, V_risk, V_i, P, pi_risk, goal, A, C, lamb, k_g, succ_states, visited=None, W_s=None):
-    if check_goal(s, goal):
+    if check_goal(utils.from_literals(s), goal):
         return {s: 0}
 
     # Setup
@@ -314,7 +315,7 @@ def __get_cmax_reachable(V_risk, P, pi_risk, goal, A, C, lamb, k_g, W_s, succ_st
     C_maxs_s = {}
 
     for s in W_s:
-        if check_goal(s, goal):
+        if check_goal(utils.from_literals(s), goal):
             if s not in C_maxs_s:
                 C_maxs_s[s] = 0
             continue
@@ -344,7 +345,7 @@ def __get_cmax_reachable(V_risk, P, pi_risk, goal, A, C, lamb, k_g, W_s, succ_st
     return C_maxs_s
 
 def get_cmax_reachable(s, V_risk, V_i, P, pi_risk, goal, A, C, lamb, k_g, succ_states, visited=None, W_s=None):
-    if check_goal(s, goal):
+    if check_goal(utils.from_literals(s), goal):
         return {s: 0}
     W_s = W_s or {}
     i = 0

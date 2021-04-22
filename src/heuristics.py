@@ -3,6 +3,7 @@ import mdp
 import utils
 from collections import deque
 import numpy as np
+from pddlgym.structs import State
 
 
 def shortest_path_from_goal(graph, V_i, s0):
@@ -97,6 +98,7 @@ def tireworld_h_p_data(env):
     return graph
 
 def tireworld_h_p(env, obs, graph):
+    obs = obs if type(obs) == State else utils.from_literals(obs)
     has_flattire = not ('not-flattire()' in set(map(str, obs.literals)))
 
     location = utils.get_values(obs.literals, 'vehicle-at')[0][0]
@@ -118,6 +120,7 @@ def tireworld_h_p(env, obs, graph):
 
 
 def tireworld_h_v(env, obs, lamb, shortest_path):
+    obs = obs if type(obs) == State else utils.from_literals(obs)
     has_flattire = not ('not-flattire()' in set(map(str, obs.literals)))
 
     location = utils.get_values(obs.literals, 'vehicle-at')[0][0]
@@ -132,6 +135,7 @@ def tireworld_h_v(env, obs, lamb, shortest_path):
         return np.exp(lamb * sp)
 
 def river_h_v(env, obs, lamb, data):
+    obs = obs if type(obs) == State else utils.from_literals(obs)
     shortest_path, _ = data
     waterfall_locs = set(chain(*utils.get_values(obs.literals, 'is-waterfall')))
 
@@ -150,6 +154,7 @@ def river_get_ny(env):
     return ny
 
 def river_h_p(env, obs, data):
+    obs = obs if type(obs) == State else utils.from_literals(obs)
     _, ny = data
     waterfall_locs = set(chain(*utils.get_values(obs.literals, 'is-waterfall')))
     river_locs = set(chain(*utils.get_values(obs.literals, 'is-river')))
@@ -166,6 +171,7 @@ def river_h_p(env, obs, data):
     return p
 
 def expblocks_h_v(env, obs, lamb, data):
+    obs = obs if type(obs) == State else utils.from_literals(obs)
     goal_lits = set(obs.goal.literals)
 
     h_empty_lits = utils.get_literals_by_name(obs.literals, 'handempty')

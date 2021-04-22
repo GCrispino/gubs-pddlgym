@@ -49,10 +49,10 @@ def create_problem_instance_from_file(dir_path, domain_path_name, problem_index=
     return env, env.problems[problem_index]
 
 def create_states_from_base_literals(base_state_literals, state_literals,
-                                     problem):
+                                     problem, only_literals=False):
     return [
         State(frozenset({*base_state_literals, *literals}),
-              frozenset(problem.objects), problem.goal)
+              frozenset(problem.objects), problem.goal) if not only_literals else frozenset({*base_state_literals, *literals})
         for literals in state_literals
     ]
 
@@ -87,6 +87,7 @@ def river_alt_get_location(obs):
 
 
 def river_alt_text_render(obs):
+    obs = obs if type(obs) == State else from_literals(obs)
     qualifiers = []
     location = river_alt_get_location(obs)
     for lit in obs.literals:
@@ -149,3 +150,7 @@ def output(output_filename, data, output_dir=None):
         json.dump(data, fp, indent=2)
 
     return output_file_path
+
+def from_literals(literals):
+    empty_set = frozenset()
+    return State(literals, empty_set, empty_set)

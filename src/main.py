@@ -198,16 +198,16 @@ print('obtaining optimal policy')
 start = time.time()
 if args.algorithm_gubs == 'ao':
     explicit_graph, bpsg, explicit_graph_dc, C_maxs, n_updates, n_updates_dc, _ = mdp.egubs_ao(
-        obs, h_v, h_p, goal, A, args.k_g, args.lamb, env, args.epsilon, args.algorithm_dc == 'lao_eliminate_traps', args.algorithm_dc == 'ilao')
+        obs.literals, h_v, h_p, goal, A, args.k_g, args.lamb, env, args.epsilon, args.algorithm_dc == 'lao_eliminate_traps', args.algorithm_dc == 'ilao')
 
-    C_max = int(C_maxs[obs])
+    C_max = int(C_maxs[obs.literals])
     print("C_max:", C_max)
     solved_states = [s for s, v in explicit_graph_dc.items() if v['solved']]
     pi_func = lambda s, C: explicit_graph[(s, C)]['pi'] if (s, C) in explicit_graph else explicit_graph_dc[s]['pi']
     keep_cost = True
     #print('Size explicit graph dc:', len(explicit_graph_dc))
-    print('Result for initial state dc:', explicit_graph_dc[obs]['prob'], explicit_graph_dc[obs]['value'])
-    print('Result for initial state:', explicit_graph[(obs, 0)]['prob'], explicit_graph[(obs, 0)]['value'], explicit_graph[(obs, 0)]['value'] + args.k_g * explicit_graph[(obs, 0)]['prob'])
+    print('Result for initial state dc:', explicit_graph_dc[obs.literals]['prob'], explicit_graph_dc[obs.literals]['value'])
+    print('Result for initial state:', explicit_graph[(obs.literals, 0)]['prob'], explicit_graph[(obs.literals, 0)]['value'], explicit_graph[(obs.literals, 0)]['value'] + args.k_g * explicit_graph[(obs.literals, 0)]['prob'])
 elif args.algorithm_dc == 'vi':
     print(' calculating list of states...')
     reach = mdp.get_all_reachable(obs, A, env)
@@ -216,7 +216,7 @@ elif args.algorithm_dc == 'vi':
 
     print('done')
     V_i = {s: i for i, s in enumerate(S)}
-    G_i = [V_i[s] for s in V_i if check_goal(s, goal)]
+    G_i = [V_i[s] for s in V_i if check_goal(utils.from_literals(s), goal)]
     #
     succ_states = {s: {} for s in reach}
     for s in reach:
@@ -242,34 +242,34 @@ elif args.algorithm_dc == 'vi':
         pi_func = lambda s, C: pi[V_i[s], C] if C < pi.shape[1] else pi[V_i[s], -1]
         n_updates = (C_max + 1) * len(S)
         keep_cost = True
-        print('Result for initial state dc:', P_dual[V_i[obs]], V_dual[V_i[obs]])
-        print('Result for initial state:', P[V_i[obs], 0], V[V_i[obs], 0])
+        print('Result for initial state dc:', P_dual[V_i[obs.literals]], V_dual[V_i[obs.literals]])
+        print('Result for initial state:', P[V_i[obs.literals], 0], V[V_i[obs.literals], 0])
     else:
         pi_func = lambda s: pi_dual[V_i[s]]
         n_updates = n_updates_dc
-        print('Result for initial state:', P_dual[V_i[obs]], V_dual[V_i[obs]])
+        print('Result for initial state:', P_dual[V_i[obs.literals]], V_dual[V_i[obs.literals]])
 
 elif args.algorithm_dc == 'lao' or args.algorithm_dc == 'lao_eliminate_traps' or args.algorithm_dc == 'ilao':
     if args.algorithm_dc == 'lao_eliminate_traps':
         explicit_graph, bpsg, n_updates, _ = mdp.lao_dual_criterion_fret(
-            obs, h_v, h_p, goal, A, args.lamb, env, args.epsilon)
+            obs.literals, h_v, h_p, goal, A, args.lamb, env, args.epsilon)
     elif args.algorithm_dc == 'lao':
         explicit_graph, bpsg, n_updates, _ = mdp.lao_dual_criterion(
-            obs, h_v, h_p, goal, A, args.lamb, env, args.epsilon, not args.not_p_zero)
+            obs.literals, h_v, h_p, goal, A, args.lamb, env, args.epsilon, not args.not_p_zero)
     elif args.algorithm_dc == 'ilao':
         explicit_graph, bpsg, n_updates, _ = mdp.ilao_dual_criterion_fret(
-            obs, h_v, h_p, goal, A, args.lamb, env, args.epsilon)
+            obs.literals, h_v, h_p, goal, A, args.lamb, env, args.epsilon)
 
     pi_func = lambda s: explicit_graph[s]['pi']
 
-    print('Result for initial state:', explicit_graph[obs]['prob'], explicit_graph[obs]['value'])
+    print('Result for initial state:', explicit_graph[obs.literals]['prob'], explicit_graph[obs.literals]['value'])
 elif args.algorithm == 'ao-dualonly-ilao':
     explicit_graph, bpsg, n_updates = mdp.ilao_dual_criterion_fret(
-        obs, h_v, h_p, goal, A, args.lamb, env, args.epsilon)
+        obs.literals, h_v, h_p, goal, A, args.lamb, env, args.epsilon)
 
     pi_func = lambda s: explicit_graph[s]['pi']
 
-    print('Result for initial state:', explicit_graph[obs]['prob'], explicit_graph[obs]['value'])
+    print('Result for initial state:', explicit_graph[obs.literals]['prob'], explicit_graph[obs.literals]['value'])
 final_time = time.time() - start
 
 if n_updates_dc:
@@ -351,7 +351,7 @@ if explicit_graph:
     for k, v in explicit_graph.items():
         if 'parents' in v:
             explicit_graph[k]['parents'] = list(explicit_graph[k]['parents'])
-    explicit_graph_new_keys = {(str((k[0].literals, k[1])) if type(k) == tuple else str(k.literals)): v
+    explicit_graph_new_keys = {(str((k[0], k[1])) if type(k) == tuple else str(k)): v
                                for k, v in explicit_graph.items()}
 
 if args.render_and_save:

@@ -172,7 +172,7 @@ def river_h_p(env, obs, data):
 
 def expblocks_h_v(env, obs, lamb, data):
     obs = obs if type(obs) == State else utils.from_literals(obs)
-    goal_lits = set(obs.goal.literals)
+    goal_lits = set(obs.goal.literals if type(obs.goal) == State else obs.goal)
 
     h_empty_lits = utils.get_literals_by_name(obs.literals, 'handempty')
     on_lits = utils.get_literals_by_name(obs.literals, 'on')

@@ -1283,9 +1283,10 @@ def ilao_dual_criterion_fret(s0,
         explicit_graph[s_]['solved'] = True
     return explicit_graph, bpsg, n_updates, succs_cache
 
-def egubs_ao(s0, h_v, h_p, goal, A, k_g, lamb, env, epsilon=1e-3, eliminate_traps=False, ilao_dc=False):
-    explicit_graph_dc, n_updates_dc, succs_cache = lao_dual_criterion_reachable(
-        s0, h_v, h_p, goal, A, lamb, env, epsilon, eliminate_traps, ilao_dc)
+def egubs_ao(s0, h_v, h_p, goal, A, k_g, lamb, env, explicit_graph_dc, n_updates_dc, succs_cache, epsilon=1e-3, eliminate_traps=False, ilao_dc=False):
+
+    #explicit_graph_dc, n_updates_dc, succs_cache = lao_dual_criterion_reachable(
+    #    s0, h_v, h_p, goal, A, lamb, env, epsilon, eliminate_traps, ilao_dc)
 
     V_risk = {s: explicit_graph_dc[s]['value']
               for s in explicit_graph_dc}
@@ -1386,3 +1387,34 @@ def egubs_ao(s0, h_v, h_p, goal, A, k_g, lamb, env, epsilon=1e-3, eliminate_trap
         i += 1
 
     return explicit_graph, bpsg, explicit_graph_dc, C_maxs, n_updates, n_updates_dc, old_n_updates
+
+def build_explicit_graph_from_functions(V_dual, P_dual, pi_dual, V_i, S, A, env, goal, succs_cache, p_zero=True):
+    def h_1(s):
+        return 1
+    for (s, a), val in succs_cache.items():
+        succs_cache[(s, a)] = {utils.from_literals(s_): val_ for s_, val_ in val.items()}
+    explicit_graph = {}
+    for s in S:
+        if check_goal(utils.from_literals(s), goal):
+            continue
+        # Fill placeholder values just so expand_state_dual_criterion doesn't crash
+        explicit_graph[s] = {
+            "value": 0, "prob": 0,
+            "solved": False, "expanded": False,
+            "pi": None, "Adj": []
+        }
+        explicit_graph = expand_state_dual_criterion(s, h_1, h_1, env, explicit_graph, goal, A, p_zero, succs_cache)
+        explicit_graph[s] = {
+            **explicit_graph[s],
+            "value": V_dual[V_i[s]],
+            "prob": P_dual[V_i[s]],
+            "solved": True,
+            "expanded": True,
+            "pi": pi_dual[V_i[s]],
+            #"Q_v": {a: h_v(s) for a in A},
+            #"Q_p": {a: h_p(s) for a in A},
+        }
+
+    return explicit_graph
+
+

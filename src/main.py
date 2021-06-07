@@ -197,8 +197,37 @@ keep_cost = False
 print('obtaining optimal policy')
 start = time.time()
 if args.algorithm_gubs == 'ao':
+    if args.algorithm_dc == 'vi':
+        print(' calculating list of states...')
+        reach = mdp.get_all_reachable(obs, A, env)
+        S = list(sorted([s for s in reach]))
+        print('Number of states:', len(S))
+
+        print('done')
+        V_i = {s: i for i, s in enumerate(S)}
+        G_i = [V_i[s] for s in V_i if check_goal(utils.from_literals(s), goal)]
+        #
+        #succ_states = {s: {} for s in reach}
+        succ_states = {}
+        for s in reach:
+            for a in A:
+                succ_states[s, a] = reach[s][a]
+        V_dual, P_dual, pi_dual, i_dual = gubs.dual_criterion(args.lamb,
+                                                              V_i,
+                                                              S,
+                                                              h_v,
+                                                              goal,
+                                                              succ_states,
+                                                              A,
+                                                              epsilon=args.epsilon)
+        n_updates_dc = i_dual * len(S)
+        explicit_graph_dc = mdp.build_explicit_graph_from_functions(V_dual, P_dual, pi_dual, V_i, S, A, env, goal, succ_states)
+        succs_cache = succ_states
+    else:
+        explicit_graph_dc, n_updates_dc, succs_cache = mdp.lao_dual_criterion_reachable(
+            obs.literals, h_v, h_p, goal, A, args.lamb, env, args.epsilon, args.algorithm_dc == 'lao_eliminate_traps', args.algorithm_dc == 'ilao')
     explicit_graph, bpsg, explicit_graph_dc, C_maxs, n_updates, n_updates_dc, _ = mdp.egubs_ao(
-        obs.literals, h_v, h_p, goal, A, args.k_g, args.lamb, env, args.epsilon, args.algorithm_dc == 'lao_eliminate_traps', args.algorithm_dc == 'ilao')
+        obs.literals, h_v, h_p, goal, A, args.k_g, args.lamb, env, explicit_graph_dc, n_updates_dc, succs_cache, args.epsilon, args.algorithm_dc == 'lao_eliminate_traps', args.algorithm_dc == 'ilao')
 
     C_max = int(C_maxs[obs.literals])
     print("C_max:", C_max)

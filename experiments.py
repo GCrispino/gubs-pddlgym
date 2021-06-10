@@ -2,9 +2,6 @@ import itertools
 import os
 
 envs = [
-    #('river5-5-40-0.json', 16),
-    #('river5-10-40-0.json', 41),
-    # ('river5-50-40-0.json', 241)
     ('PDDLEnvRiver-alt-v0', 0),
     ('PDDLEnvRiver-alt-v0', 1),
      #('PDDLEnvRiver-alt-v0', 3),
@@ -12,10 +9,12 @@ envs = [
      #('PDDLEnvTireworld-v0', 1),
      #('PDDLEnvTireworld-v0', 2)
 ]
+
+# river
 k_gs = [
-    #0.01,
-    #0.1,
-    #0.5,
+    0.01,
+    0.1,
+    0.5,
     1
 ]
 
@@ -31,13 +30,14 @@ k_gs = [
 #    1,
 #]
 
+# river
 lambs = [
-    -0.01,
-    -0.05,
+    #-0.01,
+    #-0.05,
     -0.1,
-    -0.2,
-    -0.3,
-    -0.4,
+    #-0.2,
+    #-0.3,
+    #-0.4,
     #-0.5
 ]
 
@@ -51,15 +51,18 @@ lambs = [
 #    -0.3,
 #]
 
+
 algorithms = [
-    'ao',
-    'vi'
+    ('vi', 'vi'),
+    ('vi', 'ao'),
+    ('lao', 'ao'),
+    ('lao_eliminate_traps', 'ao'),
 ]
 
 try:
-    for (env, prob_index), k_g, lamb, alg in itertools.product(envs, k_gs, lambs, algorithms):
+    for (env, prob_index), k_g, lamb, (alg_dc, alg_gubs) in itertools.product(envs, k_gs, lambs, algorithms):
         os.system(
-            f'python src/main.py --env {env} --problem_index {prob_index} --lambda {lamb} --k_g {k_g} --algorithm {alg} --epsilon 1e-10 --render_and_save')
+            f'python src/main.py --env {env} --problem_index {prob_index} --lambda {lamb} --k_g {k_g} --algorithm_dc {alg_dc} --algorithm_gubs {alg_gubs} --epsilon 1e-10 --render_and_save')
 except Exception as e:
     raise e
 finally:

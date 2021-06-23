@@ -1095,7 +1095,7 @@ def lao_dual_criterion_reachable(s0, h_v, h_p, goal, A, lamb, env, epsilon=1e-3,
     #print(' pi:', pi)
     return explicit_graph, n_updates_total, succs_cache
 
-def value_iteration_gubs(explicit_graph, V_i, A, Z, k_g, lamb, C, env):
+def value_iteration_gubs(explicit_graph, A, Z, k_g, lamb, C, env):
     n_actions = len(A)
     changed = False
     stack = copy(Z)
@@ -1371,7 +1371,7 @@ def egubs_ao(s0, h_v, h_p, goal, A, k_g, lamb, env, explicit_graph_dc, n_updates
 
         print("Z size =", len(Z))
         explicit_graph, n_updates_, _ = value_iteration_gubs(
-            explicit_graph, V_i, A, Z, k_g, lamb, C, env)
+            explicit_graph, A, Z, k_g, lamb, C, env)
         old_n_updates += len(Z)
         n_updates += n_updates_
         # print("Explicit graph after value iteration:", explicit_graph)

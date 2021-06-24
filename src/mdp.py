@@ -186,7 +186,7 @@ def expand_state_gubs(s, env, goal, explicit_graph, C, C_maxs, V_risk, P_risk, p
 
     return new_explicit_graph
 
-def expand_state_gubs_v2(s, h, env, goal, explicit_graph, C, C_maxs, V_risk, P_risk, pi_risk, V_i, A, k_g, lamb, succs_cache=None):
+def expand_state_gubs_v2(s, h, env, goal, explicit_graph, C, C_maxs, V_risk, P_risk, pi_risk, V_i, A, k_g, lamb, succs_cache=None, approx=False):
     s_literals = utils.from_literals(s[0])
     if check_goal(s_literals, goal):
         raise ValueError(
@@ -233,7 +233,9 @@ def expand_state_gubs_v2(s, h, env, goal, explicit_graph, C, C_maxs, V_risk, P_r
     for neigh in unexpanded_neighbours:
         n = neigh['state']
         # Check if maximum cost for state is known and was reached
-        if n[0] not in C_maxs:
+        if callable(C_maxs):
+            c_max_n = C_maxs(n[0])
+        elif n[0] not in C_maxs:
             raise NotImplementedError()
             # Compute succ states
             #C_maxs = gubs.get_cmax_reachable(
@@ -241,10 +243,17 @@ def expand_state_gubs_v2(s, h, env, goal, explicit_graph, C, C_maxs, V_risk, P_r
         else:
             c_max_n = C_maxs[n[0]]
 
-        solved = bool(check_goal(utils.from_literals(n[0]), goal) or n[1] >= c_max_n)
-        value = V_risk[V_i[n[0]]] if solved else h(n[0])
-        prob = P_risk[V_i[n[0]]]
-        pi = pi_risk[n[0]] if solved else None
+        is_goal = check_goal(utils.from_literals(n[0]), goal)
+        solved = bool(is_goal or n[1] >= c_max_n)
+        if approx:
+            value = 1 if is_goal else V_risk(n[0])
+            prob = 1 if is_goal else P_risk(n[0])
+            pi = A[0] if is_goal else pi_risk(n[0])
+
+        value = (V_risk(n[0]) if callable(V_risk) else V_risk[V_i[n[0]]]) if solved else h(n[0])
+        prob = P_risk(n[0]) if callable(P_risk) else P_risk[V_i[n[0]]]
+        pi = (pi_risk(n[0]) if callable(pi_risk) else pi_risk[n[0]]) if solved else None
+
         if n in new_explicit_graph:
             new_explicit_graph[n]['parents'].add(s)
         else:
@@ -1285,9 +1294,6 @@ def ilao_dual_criterion_fret(s0,
 
 def egubs_ao(s0, h_v, h_p, goal, A, k_g, lamb, env, explicit_graph_dc, n_updates_dc, succs_cache, epsilon=1e-3, eliminate_traps=False, ilao_dc=False):
 
-    #explicit_graph_dc, n_updates_dc, succs_cache = lao_dual_criterion_reachable(
-    #    s0, h_v, h_p, goal, A, lamb, env, epsilon, eliminate_traps, ilao_dc)
-
     V_risk = {s: explicit_graph_dc[s]['value']
               for s in explicit_graph_dc}
     P_risk = {s: explicit_graph_dc[s]['prob']
@@ -1387,6 +1393,72 @@ def egubs_ao(s0, h_v, h_p, goal, A, k_g, lamb, env, explicit_graph_dc, n_updates
         i += 1
 
     return explicit_graph, bpsg, explicit_graph_dc, C_maxs, n_updates, n_updates_dc, old_n_updates
+
+def egubs_ao_approx(s0, h_v, h_p, goal, A, k_g, lamb, env, C_max, epsilon=1e-3):
+    def C_maxs(_):
+        return C_max
+
+    def V_risk(s):
+        return h_v(s)
+
+    def P_risk(s):
+        return h_p(s)
+
+    def pi_risk(_):
+        return A[0]
+
+    def C(s, a):
+        s = utils.from_literals(s) if type(s) == frozenset else s
+        return 0 if check_goal(s, goal) else 1
+
+    bpsg = {(s0, 0): {"Adj": []}}
+    explicit_graph = {
+        (s0, 0): {
+            "value": h_v(s0),
+            "prob": h_p(s0),
+            "solved": False,
+            "expanded": False,
+            "pi": None,
+            "Adj": []
+        }
+    }
+
+    i = 0
+    unexpanded = get_unexpanded_states_extended(
+        goal, explicit_graph, bpsg)
+
+    n_updates = 0
+    old_n_updates = 0
+    succs_cache = {}
+    while len(unexpanded) > 0:
+        print("i =", i)
+
+        s = unexpanded[0]
+        print("Will expand", utils.text_render(env, utils.from_literals(s[0])), " with cost", s[1])
+        print()
+        for s in unexpanded:
+            explicit_graph, C_maxs, succs_cache = expand_state_gubs_v2(
+            s, h_v, env, goal, explicit_graph, C, C_maxs, V_risk, P_risk, pi_risk, None, A, k_g, lamb, succs_cache, True)
+
+        sorted_bpsg = list(reversed(topological_sort(bpsg)))
+        unexpanded_set = set(unexpanded)
+        Z = list(set([s for s in sorted_bpsg if s in unexpanded_set]))
+
+        print("Z size =", len(Z))
+        explicit_graph, n_updates_, _ = value_iteration_gubs(
+            explicit_graph, A, Z, k_g, lamb, C, env)
+        old_n_updates += len(Z)
+        n_updates += n_updates_
+
+        bpsg = update_partial_solution_extended(
+            s0, C, bpsg, explicit_graph)
+
+        unexpanded = get_unexpanded_states_extended(
+            goal, explicit_graph, bpsg)
+
+        i += 1
+
+    return explicit_graph, bpsg, n_updates, old_n_updates
 
 def build_explicit_graph_from_functions(V_dual, P_dual, pi_dual, V_i, S, A, env, goal, succs_cache, p_zero=True):
     def h_1(s):

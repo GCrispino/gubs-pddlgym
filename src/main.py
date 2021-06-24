@@ -22,6 +22,7 @@ sys.setrecursionlimit(5000)
 DEFAULT_PROB_INDEX = 0
 DEFAULT_EPSILON = 0.1
 DEFAULT_LAMBDA = -0.1
+DEFAULT_C_MAX = 50
 DEFAULT_KG = 1
 DEFAULT_ALGORITHM = 'vi'
 DEFAULT_NOT_P_ZERO = False
@@ -65,6 +66,12 @@ def parse_args():
                         default=DEFAULT_KG,
                         help="Constant goal utility (default: %s)" %
                         str(DEFAULT_LAMBDA))
+    parser.add_argument('--c_max',
+                        dest='c_max',
+                        type=int,
+                        default=DEFAULT_C_MAX,
+                        help="C_max value used in approximate version of eGUBS-AO* (default: %s)" %
+                        str(DEFAULT_C_MAX))
     parser.add_argument('--algorithm_dc',
                         dest='algorithm_dc',
                         choices=['vi', 'lao', 'lao_eliminate_traps', 'ilao'],
@@ -72,7 +79,7 @@ def parse_args():
                         help="Algorithm to solve the dual criterion (default: %s)" % DEFAULT_ALGORITHM)
     parser.add_argument('--algorithm_gubs',
                         dest='algorithm_gubs',
-                        choices=['vi', 'ao', 'none'],
+                        choices=['vi', 'ao', 'ao_approx', 'none'],
                         default=DEFAULT_ALGORITHM,
                         help="Algorithm to solve the eGUBS criterion (default: %s)" % DEFAULT_ALGORITHM)
     parser.add_argument(
@@ -236,6 +243,16 @@ if args.algorithm_gubs == 'ao':
     keep_cost = True
     #print('Size explicit graph dc:', len(explicit_graph_dc))
     print('Result for initial state dc:', explicit_graph_dc[obs.literals]['prob'], explicit_graph_dc[obs.literals]['value'])
+    print('Result for initial state:', explicit_graph[(obs.literals, 0)]['prob'], explicit_graph[(obs.literals, 0)]['value'], explicit_graph[(obs.literals, 0)]['value'] + args.k_g * explicit_graph[(obs.literals, 0)]['prob'])
+elif args.algorithm_gubs == 'ao_approx':
+    C_max = args.c_max
+    explicit_graph, bpsg, n_updates, _ = mdp.egubs_ao_approx(
+        obs.literals, h_v, h_p, goal, A, args.k_g, args.lamb, env, C_max, args.epsilon)
+
+    print("C_max:", C_max)
+    pi_func = lambda s, C: explicit_graph[(s, C)]['pi'] if (s, C) in explicit_graph else explicit_graph[(s, C_max)]['pi']
+    keep_cost = True
+    #print('Size explicit graph dc:', len(explicit_graph_dc))
     print('Result for initial state:', explicit_graph[(obs.literals, 0)]['prob'], explicit_graph[(obs.literals, 0)]['value'], explicit_graph[(obs.literals, 0)]['value'] + args.k_g * explicit_graph[(obs.literals, 0)]['prob'])
 elif args.algorithm_dc == 'vi':
     print(' calculating list of states...')

@@ -66,22 +66,28 @@ def parse_args():
                         default=DEFAULT_KG,
                         help="Constant goal utility (default: %s)" %
                         str(DEFAULT_LAMBDA))
-    parser.add_argument('--c_max',
-                        dest='c_max',
-                        type=int,
-                        default=DEFAULT_C_MAX,
-                        help="C_max value used in approximate version of eGUBS-AO* (default: %s)" %
-                        str(DEFAULT_C_MAX))
-    parser.add_argument('--algorithm_dc',
-                        dest='algorithm_dc',
-                        choices=['vi', 'lao', 'lao_eliminate_traps', 'ilao'],
-                        default=DEFAULT_ALGORITHM,
-                        help="Algorithm to solve the dual criterion (default: %s)" % DEFAULT_ALGORITHM)
-    parser.add_argument('--algorithm_gubs',
-                        dest='algorithm_gubs',
-                        choices=['vi', 'ao', 'ao_approx', 'none'],
-                        default=DEFAULT_ALGORITHM,
-                        help="Algorithm to solve the eGUBS criterion (default: %s)" % DEFAULT_ALGORITHM)
+    parser.add_argument(
+        '--c_max',
+        dest='c_max',
+        type=int,
+        default=DEFAULT_C_MAX,
+        help=
+        "C_max value used in approximate version of eGUBS-AO* (default: %s)" %
+        str(DEFAULT_C_MAX))
+    parser.add_argument(
+        '--algorithm_dc',
+        dest='algorithm_dc',
+        choices=['vi', 'lao', 'lao_eliminate_traps', 'ilao'],
+        default=DEFAULT_ALGORITHM,
+        help="Algorithm to solve the dual criterion (default: %s)" %
+        DEFAULT_ALGORITHM)
+    parser.add_argument(
+        '--algorithm_gubs',
+        dest='algorithm_gubs',
+        choices=['vi', 'ao', 'ao_approx', 'none'],
+        default=DEFAULT_ALGORITHM,
+        help="Algorithm to solve the eGUBS criterion (default: %s)" %
+        DEFAULT_ALGORITHM)
     parser.add_argument(
         '--not_p_zero',
         dest='not_p_zero',
@@ -219,41 +225,55 @@ if args.algorithm_gubs == 'ao':
         for s in reach:
             for a in A:
                 succ_states[s, a] = reach[s][a]
-        V_dual, P_dual, pi_dual, i_dual = gubs.dual_criterion(args.lamb,
-                                                              V_i,
-                                                              S,
-                                                              h_v,
-                                                              goal,
-                                                              succ_states,
-                                                              A,
-                                                              epsilon=args.epsilon)
+        V_dual, P_dual, pi_dual, i_dual = gubs.dual_criterion(
+            args.lamb, V_i, S, h_v, goal, succ_states, A, epsilon=args.epsilon)
         n_updates_dc = i_dual * len(S)
-        explicit_graph_dc = mdp.build_explicit_graph_from_functions(V_dual, P_dual, pi_dual, V_i, S, A, env, goal, succ_states)
+        explicit_graph_dc = mdp.build_explicit_graph_from_functions(
+            V_dual, P_dual, pi_dual, V_i, S, A, env, goal, succ_states)
         succs_cache = succ_states
     else:
         explicit_graph_dc, n_updates_dc, succs_cache = mdp.lao_dual_criterion_reachable(
-            obs.literals, h_v, h_p, goal, A, args.lamb, env, args.epsilon, args.algorithm_dc == 'lao_eliminate_traps', args.algorithm_dc == 'ilao')
+            obs.literals, h_v, h_p, goal, A, args.lamb, env, args.epsilon,
+            args.algorithm_dc == 'lao_eliminate_traps',
+            args.algorithm_dc == 'ilao')
     explicit_graph, bpsg, explicit_graph_dc, C_maxs, n_updates, n_updates_dc, _ = mdp.egubs_ao(
-        obs.literals, h_v, h_p, goal, A, args.k_g, args.lamb, env, explicit_graph_dc, n_updates_dc, succs_cache, args.epsilon, args.algorithm_dc == 'lao_eliminate_traps', args.algorithm_dc == 'ilao')
+        obs.literals, h_v, h_p, goal, A, args.k_g, args.lamb, env,
+        explicit_graph_dc, n_updates_dc, succs_cache, args.epsilon,
+        args.algorithm_dc == 'lao_eliminate_traps',
+        args.algorithm_dc == 'ilao')
 
     C_max = int(C_maxs[obs.literals])
     print("C_max:", C_max)
     solved_states = [s for s, v in explicit_graph_dc.items() if v['solved']]
-    pi_func = lambda s, C: explicit_graph[(s, C)]['pi'] if (s, C) in explicit_graph else explicit_graph_dc[s]['pi']
+    pi_func = lambda s, C: explicit_graph[(s, C)]['pi'] if (
+        s, C) in explicit_graph else explicit_graph_dc[s]['pi']
     keep_cost = True
     #print('Size explicit graph dc:', len(explicit_graph_dc))
-    print('Result for initial state dc:', explicit_graph_dc[obs.literals]['prob'], explicit_graph_dc[obs.literals]['value'])
-    print('Result for initial state:', explicit_graph[(obs.literals, 0)]['prob'], explicit_graph[(obs.literals, 0)]['value'], explicit_graph[(obs.literals, 0)]['value'] + args.k_g * explicit_graph[(obs.literals, 0)]['prob'])
+    print('Result for initial state dc:',
+          explicit_graph_dc[obs.literals]['prob'],
+          explicit_graph_dc[obs.literals]['value'])
+    print(
+        'Result for initial state:', explicit_graph[(obs.literals, 0)]['prob'],
+        explicit_graph[(obs.literals, 0)]['value'],
+        explicit_graph[(obs.literals, 0)]['value'] +
+        args.k_g * explicit_graph[(obs.literals, 0)]['prob'])
 elif args.algorithm_gubs == 'ao_approx':
     C_max = args.c_max
     explicit_graph, bpsg, n_updates, _ = mdp.egubs_ao_approx(
-        obs.literals, h_v, h_p, goal, A, args.k_g, args.lamb, env, C_max, args.epsilon)
+        obs.literals, h_v, h_p, goal, A, args.k_g, args.lamb, env, C_max,
+        args.epsilon)
 
     print("C_max:", C_max)
-    pi_func = lambda s, C: explicit_graph[(s, C)]['pi'] if (s, C) in explicit_graph else explicit_graph[(s, C_max)]['pi']
+    pi_func = lambda s, C: explicit_graph[
+        (s, C)]['pi'] if (s, C) in explicit_graph else explicit_graph[
+            (s, C_max)]['pi']
     keep_cost = True
     #print('Size explicit graph dc:', len(explicit_graph_dc))
-    print('Result for initial state:', explicit_graph[(obs.literals, 0)]['prob'], explicit_graph[(obs.literals, 0)]['value'], explicit_graph[(obs.literals, 0)]['value'] + args.k_g * explicit_graph[(obs.literals, 0)]['prob'])
+    print(
+        'Result for initial state:', explicit_graph[(obs.literals, 0)]['prob'],
+        explicit_graph[(obs.literals, 0)]['value'],
+        explicit_graph[(obs.literals, 0)]['value'] +
+        args.k_g * explicit_graph[(obs.literals, 0)]['prob'])
 elif args.algorithm_dc == 'vi':
     print(' calculating list of states...')
     reach = mdp.get_all_reachable(obs, A, env)
@@ -285,15 +305,19 @@ elif args.algorithm_dc == 'vi':
         print("C_max:", C_max)
         V, P, pi = gubs.egubs_vi(V_dual, P_dual, pi_dual, C_max, args.lamb,
                                  args.k_g, V_i, S, goal, succ_states, A)
-        pi_func = lambda s, C: pi[V_i[s], C] if C < pi.shape[1] else pi[V_i[s], -1]
+        pi_func = lambda s, C: pi[V_i[s], C] if C < pi.shape[1] else pi[V_i[s],
+                                                                        -1]
         n_updates = (C_max + 1) * len(S)
         keep_cost = True
-        print('Result for initial state dc:', P_dual[V_i[obs.literals]], V_dual[V_i[obs.literals]])
-        print('Result for initial state:', P[V_i[obs.literals], 0], V[V_i[obs.literals], 0])
+        print('Result for initial state dc:', P_dual[V_i[obs.literals]],
+              V_dual[V_i[obs.literals]])
+        print('Result for initial state:', P[V_i[obs.literals], 0],
+              V[V_i[obs.literals], 0])
     else:
         pi_func = lambda s: pi_dual[V_i[s]]
         n_updates = n_updates_dc
-        print('Result for initial state:', P_dual[V_i[obs.literals]], V_dual[V_i[obs.literals]])
+        print('Result for initial state:', P_dual[V_i[obs.literals]],
+              V_dual[V_i[obs.literals]])
 
 elif args.algorithm_dc == 'lao' or args.algorithm_dc == 'lao_eliminate_traps' or args.algorithm_dc == 'ilao':
     if args.algorithm_dc == 'lao_eliminate_traps':
@@ -301,21 +325,24 @@ elif args.algorithm_dc == 'lao' or args.algorithm_dc == 'lao_eliminate_traps' or
             obs.literals, h_v, h_p, goal, A, args.lamb, env, args.epsilon)
     elif args.algorithm_dc == 'lao':
         explicit_graph, bpsg, n_updates, _ = mdp.lao_dual_criterion(
-            obs.literals, h_v, h_p, goal, A, args.lamb, env, args.epsilon, not args.not_p_zero)
+            obs.literals, h_v, h_p, goal, A, args.lamb, env, args.epsilon,
+            not args.not_p_zero)
     elif args.algorithm_dc == 'ilao':
         explicit_graph, bpsg, n_updates, _ = mdp.ilao_dual_criterion_fret(
             obs.literals, h_v, h_p, goal, A, args.lamb, env, args.epsilon)
 
     pi_func = lambda s: explicit_graph[s]['pi']
 
-    print('Result for initial state:', explicit_graph[obs.literals]['prob'], explicit_graph[obs.literals]['value'])
+    print('Result for initial state:', explicit_graph[obs.literals]['prob'],
+          explicit_graph[obs.literals]['value'])
 elif args.algorithm == 'ao-dualonly-ilao':
     explicit_graph, bpsg, n_updates = mdp.ilao_dual_criterion_fret(
         obs.literals, h_v, h_p, goal, A, args.lamb, env, args.epsilon)
 
     pi_func = lambda s: explicit_graph[s]['pi']
 
-    print('Result for initial state:', explicit_graph[obs.literals]['prob'], explicit_graph[obs.literals]['value'])
+    print('Result for initial state:', explicit_graph[obs.literals]['prob'],
+          explicit_graph[obs.literals]['value'])
 final_time = time.time() - start
 
 if n_updates_dc:
@@ -397,19 +424,26 @@ if explicit_graph:
     for k, v in explicit_graph.items():
         if 'parents' in v:
             explicit_graph[k]['parents'] = list(explicit_graph[k]['parents'])
-    explicit_graph_new_keys = {(str((k[0], k[1])) if type(k) == tuple else str(k)): v
+    explicit_graph_new_keys = {(str(
+        (k[0], k[1])) if type(k) == tuple else str(k)): v
                                for k, v in explicit_graph.items()}
 
 if args.render_and_save:
     output_filename = str(datetime.time(datetime.now())) + '.json'
-    output_file_path = utils.output(
-        output_filename, {
-            **vars(args), 'cpu_time': final_time,
-            'n_updates': n_updates,
-            'n_updates_dc': n_updates_dc,
-            'explicit_graph_size': len(explicit_graph_new_keys) if explicit_graph_new_keys else 0,
-            'explicit_graph_dc_size': len(explicit_graph_dc) if explicit_graph_dc else 0,
-            'C_max': C_max
-        }, output_dir=output_dir)
+    output_file_path = utils.output(output_filename, {
+        **vars(args), 'cpu_time':
+        final_time,
+        'n_updates':
+        n_updates,
+        'n_updates_dc':
+        n_updates_dc,
+        'explicit_graph_size':
+        len(explicit_graph_new_keys) if explicit_graph_new_keys else 0,
+        'explicit_graph_dc_size':
+        len(explicit_graph_dc) if explicit_graph_dc else 0,
+        'C_max':
+        C_max
+    },
+                                    output_dir=output_dir)
     if output_file_path:
         print("Algorithm result written to ", output_file_path)

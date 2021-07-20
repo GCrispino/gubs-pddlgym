@@ -162,7 +162,7 @@ def run_episode(pi,
     cum_reward = 0
     for i in range(1, n_steps + 1):
         old_obs = obs
-        a = pi(obs) if not keep_cost else pi(obs, i - 1)
+        a = pi(obs.literals) if not keep_cost else pi(obs.literals, i - 1)
         obs, reward, done, _ = env.step(a)
         cum_reward += reward
         if print_history:

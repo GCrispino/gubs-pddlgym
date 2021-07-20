@@ -358,5 +358,5 @@ def get_cmax_reachable(s, V_risk, V_i, P, pi_risk, goal, A, C, lamb, k_g, succ_s
         C_maxs_s = __get_cmax_reachable(
             V_risk, P, pi_risk, goal, A, C, lamb, k_g, C_maxs_s, succ_states)
         i += 1
-    return C_maxs_s
+    return C_maxs_s, W_s
 

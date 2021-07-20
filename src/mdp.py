@@ -1524,7 +1524,7 @@ def egubs_ao(s0,
                     succ_states[s_, a] = {}
                 if s__['state'] not in succ_states[s_, a]:
                     succ_states[s_, a][s__['state']] = p
-    C_maxs = gubs.get_cmax_reachable(s0, V_risk, V_i, P_risk, pi_risk, goal, A,
+    C_maxs, W_s = gubs.get_cmax_reachable(s0, V_risk, V_i, P_risk, pi_risk, goal, A,
                                      C, lamb, k_g, succ_states)
     c_max_values = [x for x in C_maxs.values()]
     max_c = max(c_max_values)

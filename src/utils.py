@@ -5,10 +5,12 @@ from pddlgym.structs import State
 #def find_state_by_coord(x, y):
 #    return [s for s in S if get_values(s.literals, 'robot-at')[0][1].split(':')[0][1:-1] == f'{x}-{y}'][0]
 #
-#    
+#
+
 
 def flatten(l):
     return [x for l_i in l for x in l_i]
+
 
 def get_values(obs, name):
     values = []
@@ -17,17 +19,23 @@ def get_values(obs, name):
             values.append(lit.variables)
     return values
 
+
 def get_objects_by_name(objs, name):
     return [obj for obj in objs if str(obj).split(':')[1] == name]
+
 
 def get_literals_by_name(s, name):
     return frozenset((lit for lit in s if lit.predicate.name == name))
 
+
 def get_literals_that_start_with(s, pattern):
-    return frozenset((lit for lit in s if lit.predicate.name.startswith(pattern)))
+    return frozenset(
+        (lit for lit in s if lit.predicate.name.startswith(pattern)))
+
 
 def get_coord_from_location_obj(obj):
     return tuple(map(int, obj.split(':')[0][1:-1].split('-')))
+
 
 def get_coord_from_state(s):
     robot_at_lits = get_values(s.literals, 'robot-at')
@@ -36,7 +44,10 @@ def get_coord_from_state(s):
 
     return tuple(map(int, str_coords))
 
-def create_problem_instance_from_file(dir_path, domain_path_name, problem_index=0):
+
+def create_problem_instance_from_file(dir_path,
+                                      domain_path_name,
+                                      problem_index=0):
     domain_file = os.path.join(dir_path, 'pddl', f'{domain_path_name}.pddl')
     problem_dir = os.path.join(dir_path, 'pddl', f'{domain_path_name}')
 
@@ -48,13 +59,18 @@ def create_problem_instance_from_file(dir_path, domain_path_name, problem_index=
     env.fix_problem_index(problem_index)
     return env, env.problems[problem_index]
 
-def create_states_from_base_literals(base_state_literals, state_literals,
-                                     problem, only_literals=False):
+
+def create_states_from_base_literals(base_state_literals,
+                                     state_literals,
+                                     problem,
+                                     only_literals=False):
     return [
         State(frozenset({*base_state_literals, *literals}),
-              frozenset(problem.objects), problem.goal) if not only_literals else frozenset({*base_state_literals, *literals})
+              frozenset(problem.objects), problem.goal)
+        if not only_literals else frozenset({*base_state_literals, *literals})
         for literals in state_literals
     ]
+
 
 # Text rendering
 # ===========================================================================
@@ -75,6 +91,7 @@ def tireworld_text_render(obs):
         {"Flat tire" if flattire else ""}
     """
 
+
 def river_alt_get_location(obs):
     location = None
 
@@ -91,12 +108,14 @@ def river_alt_text_render(obs):
     qualifiers = []
     location = river_alt_get_location(obs)
     for lit in obs.literals:
-        if lit.predicate.name != 'robot-at' and lit.predicate.name != 'conn' and lit.variables[0] == location:
+        if lit.predicate.name != 'robot-at' and lit.predicate.name != 'conn' and lit.variables[
+                0] == location:
             qualifiers.append(lit.predicate.name)
     return f"""
         Robot at {location}
         {f"Qualifiers: {qualifiers}" if len(qualifiers) > 0 else ""}
     """
+
 
 def expblocks_text_render(obs):
     clear = []
@@ -127,6 +146,7 @@ def expblocks_text_render(obs):
         {on}
     """
 
+
 text_render_env_functions = {
     "PDDLEnvTireworld-v0": tireworld_text_render,
     "PDDLEnvExplodingblocks-v0": expblocks_text_render,
@@ -134,10 +154,13 @@ text_render_env_functions = {
     "PDDLEnvRiver-alt-v0": river_alt_text_render,
 }
 
+
 def text_render(env, obs):
     if env.spec.id not in text_render_env_functions:
         return ""
     return text_render_env_functions[env.spec.id](obs)
+
+
 # ===========================================================================
 def output(output_filename, data, output_dir=None):
     output_dir = output_dir or "./output"
@@ -151,6 +174,16 @@ def output(output_filename, data, output_dir=None):
 
     return output_file_path
 
+
 def from_literals(literals):
     empty_set = frozenset()
     return State(literals, empty_set, empty_set)
+
+
+def get_succ_states_actions(s, A, succ_states):
+    succs = set()
+    for a in A:
+        for s_ in succ_states[s, a]:
+            succs.add(s_)
+    return succs
+

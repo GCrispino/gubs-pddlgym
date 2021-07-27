@@ -91,6 +91,8 @@ def tireworld_text_render(obs):
         {"Flat tire" if flattire else ""}
     """
 
+def navigation_get_locations(obs):
+    return get_values(obs.literals, 'robot-at')
 
 def river_alt_get_location(obs):
     location = None
@@ -116,6 +118,20 @@ def river_alt_text_render(obs):
         {f"Qualifiers: {qualifiers}" if len(qualifiers) > 0 else ""}
     """
 
+def navigation_text_render(obs):
+    obs = obs if type(obs) == State else from_literals(obs)
+    qualifiers = []
+    locations = navigation_get_locations(obs)
+
+    location = "deadend" if locations == [] else locations[0][0]
+    for lit in obs.literals:
+        if lit.predicate.name != 'robot-at' and lit.predicate.name != 'conn' and lit.variables[
+                0] == location:
+            qualifiers.append(lit.predicate.name)
+    return f"""
+        Robot at {location}
+        {f"Qualifiers: {qualifiers}" if len(qualifiers) > 0 else ""}
+    """
 
 def expblocks_text_render(obs):
     clear = []
@@ -147,11 +163,14 @@ def expblocks_text_render(obs):
     """
 
 
+navigation_is = range(1, 5)
+navigation_keys = [f"PDDLEnvNavigation{i}-v0" for i in navigation_is]
 text_render_env_functions = {
     "PDDLEnvTireworld-v0": tireworld_text_render,
     "PDDLEnvExplodingblocks-v0": expblocks_text_render,
     "PDDLEnvExplodingblocksTest-v0": expblocks_text_render,
     "PDDLEnvRiver-alt-v0": river_alt_text_render,
+    **{k: navigation_text_render for k in navigation_keys}
 }
 
 

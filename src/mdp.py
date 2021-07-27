@@ -692,9 +692,9 @@ def eliminate_traps(bpsg, goal, A, explicit_graph, env, succs_cache):
                         succs_cache[(s, a)] = succs
                     all_succs.update(set(succs))
                     for s_ in succs:
-                        if s_ != s:
+                        if s_.literals != s:
                             actions_diff_state.add(a)
-                        if s_ not in trap:
+                        if s_.literals not in trap:
                             found_action = True
                             actions.add(a)
             else:
@@ -717,7 +717,6 @@ def eliminate_traps(bpsg, goal, A, explicit_graph, env, succs_cache):
         else:
             # transient
             shape = len(trap), len(actions)
-            A_i = {a: i for i, a in enumerate(A)}
             Q_v = np.zeros(shape)
             Q_p = np.zeros(shape)
             trap_states = list(trap)

@@ -1504,7 +1504,8 @@ def egubs_ao(s0,
              succs_cache,
              epsilon=1e-3,
              eliminate_traps=False,
-             ilao_dc=False):
+             ilao_dc=False,
+             expansion_levels=3):
 
     V_risk = {s: explicit_graph_dc[s]['value'] for s in explicit_graph_dc}
     P_risk = {s: explicit_graph_dc[s]['prob'] for s in explicit_graph_dc}
@@ -1572,17 +1573,30 @@ def egubs_ao(s0,
         #for s in unexpanded:
         #explicit_graph, C_maxs = expand_state_gubs_v2(
         #    s, h_v, env, goal, explicit_graph, C, C_maxs, V_risk, P_risk, pi_risk, V_i, A, k_g, lamb)
-        for s in unexpanded:
-            explicit_graph, C_maxs, succs_cache = expand_state_gubs_v2(
-                s, h_v, env, goal, explicit_graph, C, C_maxs, V_risk, P_risk,
-                pi_risk, V_i, A, k_g, lamb, succs_cache)
+        # TODO -> Nota: ver porque os unexpanded fica sempre 0 depois do primeiro e também lembrando que ta expandindo só uma vez
+        total_unexpanded = set()
+        for level in range(expansion_levels):
+            if level > 0:
+                # If later than first time, calc unexpanded states again
+                unexpanded = get_unexpanded_states_extended(goal, explicit_graph, bpsg)
+            print(f"Level: {level},unexpanded: {len(unexpanded)}")
+            for s in unexpanded:
+                explicit_graph, C_maxs, succs_cache = expand_state_gubs_v2(
+                    s, h_v, env, goal, explicit_graph, C, C_maxs, V_risk, P_risk,
+                    pi_risk, V_i, A, k_g, lamb, succs_cache)
+                print('explicit_graph size:', len(explicit_graph))
+            bpsg = update_partial_solution_extended(s0, C, bpsg, explicit_graph)
+            total_unexpanded.update(set(unexpanded))
         # print("Explicit graph after:", explicit_graph)
         # print()
         # print("Best partial solution graph before:", bpsg)
         # print()
         #Z = [s]
         sorted_bpsg = list(reversed(topological_sort(bpsg)))
-        unexpanded_set = set(unexpanded)
+        #unexpanded_set = set(unexpanded)
+        unexpanded_set = set(total_unexpanded)
+
+        # TODO -> como fazer com esse Z no eGUBS-AO*-k?
         Z = list(set([s for s in sorted_bpsg if s in unexpanded_set]))
 
         print("Z size =", len(Z))

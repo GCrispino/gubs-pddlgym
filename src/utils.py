@@ -75,6 +75,7 @@ def create_states_from_base_literals(base_state_literals,
 # Text rendering
 # ===========================================================================
 def tireworld_text_render(obs):
+    obs = obs if type(obs) == State else from_literals(obs)
     vehicle_location = None
     flattire = True
     spare_in_locs = []

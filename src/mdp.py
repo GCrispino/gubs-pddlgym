@@ -300,8 +300,11 @@ def expand_state_gubs_v2(s,
         value = (V_risk(n[0]) if callable(V_risk) else
                  V_risk[V_i[n[0]]]) if solved else h(n[0])
         prob = P_risk(n[0]) if callable(P_risk) else P_risk[V_i[n[0]]]
+        # TODO -> Melhorar esse A[0] aqui
+        #           - Fazer ser opcional? Por ex só fazer isso quando algum parâmetro multiple_leves for verdadeiro, ou algo assim
+        #           - Além disso, ao invés de escolher a primeira ação, escolher a melhor ação segundo a heurística
         pi = (pi_risk(n[0])
-              if callable(pi_risk) else pi_risk[n[0]]) if solved else None
+              if callable(pi_risk) else pi_risk[n[0]]) if solved else A[0]
 
         if n in new_explicit_graph:
             new_explicit_graph[n]['parents'].add(s)
@@ -318,7 +321,11 @@ def expand_state_gubs_v2(s,
 
     new_explicit_graph[s]['expanded'] = True
 
-    return new_explicit_graph, C_maxs, succs_cache
+    # TODO -> Construir unexpanded_set lá em cima, quando tiver construindo o unexpanded_neighbours
+    unexpanded_set = set([n['state'] for n in unexpanded_neighbours if not check_goal(utils.from_literals(n['state'][0]), goal)])
+
+
+    return new_explicit_graph, C_maxs, succs_cache, unexpanded_set
 
 
 def get_unexpanded_states(goal, explicit_graph, bpsg):
@@ -1505,7 +1512,7 @@ def egubs_ao(s0,
              epsilon=1e-3,
              eliminate_traps=False,
              ilao_dc=False,
-             expansion_levels=3):
+             expansion_levels=2):
 
     V_risk = {s: explicit_graph_dc[s]['value'] for s in explicit_graph_dc}
     P_risk = {s: explicit_graph_dc[s]['prob'] for s in explicit_graph_dc}
@@ -1532,13 +1539,8 @@ def egubs_ao(s0,
     # C_maxs = {k: max_c for k in C_maxs}
     # print("C_maxs:", C_maxs)
 
-    # "unexpand" all states in mdp_obj
-    #for s in mdp_obj:
-    #    mdp_obj[s]['expanded'] = False
 
     solved = bool(C_maxs[s0] == 0)
-    #if solved:
-    #    mdp_obj[s0]['solved'] = True
     value = V_risk[V_i[s0]] if solved else 1
     prob = P_risk[V_i[s0]]
     pi = pi_risk[V_i[s0]] if solved else None
@@ -1556,61 +1558,68 @@ def egubs_ao(s0,
     }
 
     i = 0
-    unexpanded = get_unexpanded_states_extended(goal, explicit_graph, bpsg)
+    unexpanded = set(get_unexpanded_states_extended(goal, explicit_graph, bpsg))
 
     n_updates = 0
     old_n_updates = 0
-    while len(unexpanded) > 0:
+    while not explicit_graph[(s0, 0)]['solved']:
         print("i =", i)
         #print("Unexpanded states:", unexpanded)
 
-        s = unexpanded[0]
-        print("Will expand", utils.text_render(env, utils.from_literals(s[0])),
-              " with cost", s[1])
-        print()
-        # input()
-        # print("Explicit graph before:", explicit_graph)
-        #for s in unexpanded:
-        #explicit_graph, C_maxs = expand_state_gubs_v2(
-        #    s, h_v, env, goal, explicit_graph, C, C_maxs, V_risk, P_risk, pi_risk, V_i, A, k_g, lamb)
-        # TODO -> Nota: ver porque os unexpanded fica sempre 0 depois do primeiro e também lembrando que ta expandindo só uma vez
-        total_unexpanded = set()
-        for level in range(expansion_levels):
-            if level > 0:
-                # If later than first time, calc unexpanded states again
-                unexpanded = get_unexpanded_states_extended(goal, explicit_graph, bpsg)
-            print(f"Level: {level},unexpanded: {len(unexpanded)}")
-            for s in unexpanded:
-                explicit_graph, C_maxs, succs_cache = expand_state_gubs_v2(
-                    s, h_v, env, goal, explicit_graph, C, C_maxs, V_risk, P_risk,
-                    pi_risk, V_i, A, k_g, lamb, succs_cache)
-                print('explicit_graph size:', len(explicit_graph))
-            bpsg = update_partial_solution_extended(s0, C, bpsg, explicit_graph)
-            total_unexpanded.update(set(unexpanded))
-        # print("Explicit graph after:", explicit_graph)
-        # print()
-        # print("Best partial solution graph before:", bpsg)
-        # print()
-        #Z = [s]
-        sorted_bpsg = list(reversed(topological_sort(bpsg)))
-        #unexpanded_set = set(unexpanded)
-        unexpanded_set = set(total_unexpanded)
+        if len(unexpanded) > 0:
+            s = list(unexpanded)[0]
+            print("Will expand", utils.text_render(env, utils.from_literals(s[0])),
+                  " with cost", s[1])
+            print()
 
-        # TODO -> como fazer com esse Z no eGUBS-AO*-k?
-        Z = list(set([s for s in sorted_bpsg if s in unexpanded_set]))
+            # TODO -> Expandir vários níveis:
+            #   - Expande estados não expandidos do bpsg
+            #   - guarda novos estados adicionados no grafo explícito em um conjunto de não expandidos
+            #   - Pra cada nível (faz isso expansion_levels - 1 vezes):
+            #       - Pra cada estado no conjunto de não expandidos:
+            #           - Remove estado s do conjunto
+            #           - Expande s 
+            #               - Guarda novos estados não expandidos encontrados em conjunto de não expandidos
+            total_unexpanded = set(unexpanded)
+            new_unexpanded_set = set()
+            for level in range(expansion_levels):
+                print(f"Level: {level},unexpanded: {len(total_unexpanded)}")
+                while True:
+                    try:
+                        s = unexpanded.pop()
+                    except KeyError:
+                        break
+
+                    explicit_graph, C_maxs, succs_cache, new_unexpanded = expand_state_gubs_v2(
+                        s, h_v, env, goal, explicit_graph, C, C_maxs, V_risk, P_risk,
+                        pi_risk, V_i, A, k_g, lamb, succs_cache)
+
+                    new_unexpanded_set.update(new_unexpanded)
+
+                total_unexpanded.update(new_unexpanded_set)
+                unexpanded = new_unexpanded_set
+                new_unexpanded_set = set()
+
+            # Update BPSG with new expanded states
+            bpsg = update_partial_solution_extended(s0, C, bpsg, explicit_graph)
+
+            sorted_bpsg = list(reversed(topological_sort(bpsg)))
+            unexpanded_set = set(total_unexpanded)
+
+            Z = list(set([s for s in sorted_bpsg if s in unexpanded_set]))
+        else:
+            sorted_bpsg = list(reversed(topological_sort(bpsg)))
+            Z = sorted_bpsg
+
 
         print("Z size =", len(Z))
         explicit_graph, n_updates_, _ = value_iteration_gubs(
             explicit_graph, A, Z, k_g, lamb, C, env)
         old_n_updates += len(Z)
         n_updates += n_updates_
-        # print("Explicit graph after value iteration:", explicit_graph)
-        # print()
 
         bpsg = update_partial_solution_extended(s0, C, bpsg, explicit_graph)
-        # print("Best partial solution graph after:", bpsg)
-        # print()
-        unexpanded = get_unexpanded_states_extended(goal, explicit_graph, bpsg)
+        unexpanded = set(get_unexpanded_states_extended(goal, explicit_graph, bpsg))
 
         i += 1
 
@@ -1669,7 +1678,7 @@ def egubs_ao_approx(s0,
               " with cost", s[1])
         print()
         for s in unexpanded:
-            explicit_graph, C_maxs, succs_cache = expand_state_gubs_v2(
+            explicit_graph, C_maxs, succs_cache, _ = expand_state_gubs_v2(
                 s, h_v, env, goal, explicit_graph, C, C_maxs, V_risk, P_risk,
                 pi_risk, None, A, k_g, lamb, succs_cache, True)
 

@@ -1564,7 +1564,6 @@ def egubs_ao(s0,
     old_n_updates = 0
     while not explicit_graph[(s0, 0)]['solved']:
         print("i =", i)
-        #print("Unexpanded states:", unexpanded)
 
         if len(unexpanded) > 0:
             s = list(unexpanded)[0]
@@ -1572,14 +1571,9 @@ def egubs_ao(s0,
                   " with cost", s[1])
             print()
 
-            # TODO -> Expandir vários níveis:
-            #   - Expande estados não expandidos do bpsg
-            #   - guarda novos estados adicionados no grafo explícito em um conjunto de não expandidos
-            #   - Pra cada nível (faz isso expansion_levels - 1 vezes):
-            #       - Pra cada estado no conjunto de não expandidos:
-            #           - Remove estado s do conjunto
-            #           - Expande s 
-            #               - Guarda novos estados não expandidos encontrados em conjunto de não expandidos
+            # - Expansion:
+            #       If expansion_levels > 1, more than one level in the state tree is expanded in the same iteration
+            #       For each level, states are expanded and newly found states are added to a unexpanded set
             total_unexpanded = set(unexpanded)
             new_unexpanded_set = set()
             for level in range(expansion_levels):

@@ -1301,7 +1301,7 @@ def value_iteration_gubs(explicit_graph, A, Z, k_g, lamb, C, env):
         z_graph.pop(s)
 
         if explicit_graph[s]['solved']:
-            print("SOLVED", s)
+            print("SOLVED", utils.text_render(env, s[0]), s[1])
             continue
         c = s[1]
         q_actions_results = np.zeros(n_actions)

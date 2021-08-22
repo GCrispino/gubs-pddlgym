@@ -1514,7 +1514,7 @@ def egubs_ao(s0,
              epsilon=1e-3,
              eliminate_traps=False,
              ilao_dc=False,
-             expansion_levels=2):
+             expansion_levels=1):
 
     V_risk = {s: explicit_graph_dc[s]['value'] for s in explicit_graph_dc}
     P_risk = {s: explicit_graph_dc[s]['prob'] for s in explicit_graph_dc}

@@ -24,6 +24,7 @@ DEFAULT_EPSILON = 0.1
 DEFAULT_LAMBDA = -0.1
 DEFAULT_C_MAX = 50
 DEFAULT_KG = 1
+DEFAULT_EXPANSION_LEVELS = 1
 DEFAULT_ALGORITHM = 'vi'
 DEFAULT_NOT_P_ZERO = False
 DEFAULT_SIMULATE = False
@@ -66,6 +67,12 @@ def parse_args():
                         default=DEFAULT_KG,
                         help="Constant goal utility (default: %s)" %
                         str(DEFAULT_LAMBDA))
+    parser.add_argument('--expansion_levels',
+                        dest='expansion_levels',
+                        type=int,
+                        default=DEFAULT_EXPANSION_LEVELS,
+                        help="Expansion levels in eGUBS-AO* (default: %s)" %
+                        str(DEFAULT_EXPANSION_LEVELS))
     parser.add_argument(
         '--c_max',
         dest='c_max',
@@ -240,7 +247,7 @@ if args.algorithm_gubs == 'ao':
         obs.literals, h_v, h_p, goal, A, args.k_g, args.lamb, env,
         explicit_graph_dc, n_updates_dc, succs_cache, args.epsilon,
         args.algorithm_dc == 'lao_eliminate_traps',
-        args.algorithm_dc == 'ilao')
+        args.algorithm_dc == 'ilao', args.expansion_levels)
 
     C_max = int(C_maxs[obs.literals])
     print("C_max:", C_max)

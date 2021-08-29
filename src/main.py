@@ -442,7 +442,21 @@ if args.render_and_save:
         'explicit_graph_dc_size':
         len(explicit_graph_dc) if explicit_graph_dc else 0,
         'C_max':
-        C_max
+        C_max,
+        'value_s0_dc':
+        explicit_graph_dc[obs.literals]['value']
+        if explicit_graph_dc else V_dual[V_i[obs.literals]],
+        'maxprob_s0':
+        explicit_graph_dc[obs.literals]['prob']
+        if explicit_graph_dc else P_dual[V_i[obs.literals]],
+        'value_s0_gubs':
+        explicit_graph[(obs.literals, 0)]['value'] +
+        args.k_g * explicit_graph[(obs.literals, 0)]['prob']
+        if explicit_graph else V[V_i[obs.literals], 0],
+        'prob_s0_gubs':
+        explicit_graph[(obs.literals,
+                        0)]['prob'] if explicit_graph else P[V_i[obs.literals],
+                                                             0]
     },
                                     output_dir=output_dir)
     if output_file_path:

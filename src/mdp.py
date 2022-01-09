@@ -277,6 +277,7 @@ def expand_state_gubs_v2(s,
         if s not in new_explicit_graph[n]['parents']:
             new_explicit_graph[n]['parents'].add(s)
 
+    unexpanded_set = set()
     for neigh in unexpanded_neighbours:
         n = neigh['state']
         # Check if maximum cost for state is known and was reached
@@ -291,6 +292,14 @@ def expand_state_gubs_v2(s,
             c_max_n = C_maxs[n[0]]
 
         is_goal = check_goal(utils.from_literals(n[0]), goal)
+
+        # TODO -> incluir aqui trecho pra verificar se estado já passou do seu C_max
+        if not check_goal(utils.from_literals(n[0]), goal):
+            if n[1] >= c_max_n:
+                # if cost is higher than maximum, skip neighbor
+                continue
+            unexpanded_set.add(n)
+
         solved = bool(is_goal or n[1] >= c_max_n)
         if approx:
             value = 1 if is_goal else V_risk(n[0])
@@ -320,12 +329,6 @@ def expand_state_gubs_v2(s,
             }
 
     new_explicit_graph[s]['expanded'] = True
-
-    # TODO -> Construir unexpanded_set lá em cima, quando tiver construindo o unexpanded_neighbours
-    unexpanded_set = set([
-        n['state'] for n in unexpanded_neighbours
-        if not check_goal(utils.from_literals(n['state'][0]), goal)
-    ])
 
     return new_explicit_graph, C_maxs, succs_cache, unexpanded_set
 
@@ -1290,7 +1293,6 @@ def lao_dual_criterion_reachable(s0,
     #print(' pi:', pi)
     return explicit_graph, n_updates_total, succs_cache
 
-
 def value_iteration_gubs(explicit_graph, A, Z, k_g, lamb, C, env):
     n_actions = len(A)
     changed = False
@@ -1540,6 +1542,7 @@ def egubs_ao(s0,
     mean_c = np.mean(c_max_values)
     # C_maxs = {k: max_c for k in C_maxs}
     # print("C_maxs:", C_maxs)
+    print("C_max(s_0):", int(C_maxs[s0]))
 
     solved = bool(C_maxs[s0] == 0)
     value = V_risk[V_i[s0]] if solved else 1
@@ -1567,6 +1570,8 @@ def egubs_ao(s0,
     while not explicit_graph[(s0, 0)]['solved']:
         print("i =", i)
 
+        #  início egubs-ao-expand
+        #  ==================================================
         if len(unexpanded) > 0:
             s = list(unexpanded)[0]
             print("Will expand",
@@ -1608,6 +1613,7 @@ def egubs_ao(s0,
         else:
             sorted_bpsg = list(reversed(topological_sort(bpsg)))
             Z = sorted_bpsg
+        #  ==================================================
 
         print("Z size =", len(Z))
         explicit_graph, n_updates_, _ = value_iteration_gubs(

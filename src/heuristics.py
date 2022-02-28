@@ -248,12 +248,12 @@ def navigation_h_p(env, obs, data):
         return 0
 
     location = locations[0][0]
-    y_coord = int(location[1:-1].split('-')[1])
+    x_coord = int(location[1:-1].split('-')[0])
 
     if location not in prob_locs:
         return 1
 
-    return navigation_col_prob(env, y_coord)
+    return navigation_col_prob(env, x_coord)
 
 
 navigation_is = range(1, 5)

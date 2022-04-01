@@ -251,7 +251,7 @@ def can_improve(V, V_i, s, a, C, lamb, succ_states):
 
 def get_w_reachable(s, V_risk, V_i, P, pi_risk, goal, A, C, lamb, k_g, succ_states, visited=None, W_s=None):
     if check_goal(utils.from_literals(s), goal):
-        return {s: 0}
+        return {s: float('-inf')}
 
     # Setup
     # =================================================
@@ -287,7 +287,7 @@ def get_w_reachable(s, V_risk, V_i, P, pi_risk, goal, A, C, lamb, k_g, succ_stat
     W_a = [W(s, a, V_diff, V_i, P, k_g, lamb, succ_states)
            for a, V_diff in candidates]
 
-    W_max_a = max(W_a, default=0)
+    W_max_a = max(W_a, default=float('-inf'))
     W_reachable = []
     for s_, A_ in reachable_by_actions.items():
         if s_ not in visited and s_ not in W_s:
@@ -302,7 +302,7 @@ def get_w_reachable(s, V_risk, V_i, P, pi_risk, goal, A, C, lamb, k_g, succ_stat
                 max([W_s[s_] - C(s, a) for a in A_])
             )
 
-    W_reachable_max = max(W_reachable, default=0)
+    W_reachable_max = max(W_reachable, default=float('-inf'))
 
     W_s[s] = W_max_a \
         if (W_max_a >= W_reachable_max) \
@@ -317,7 +317,7 @@ def __get_cmax_reachable(V_risk, P, pi_risk, goal, A, C, lamb, k_g, W_s, succ_st
     for s in W_s:
         if check_goal(utils.from_literals(s), goal):
             if s not in C_maxs_s:
-                C_maxs_s[s] = 0
+                C_maxs_s[s] = float('-inf')
             continue
         #reachable_by_actions = {_s['name']: _s['A']
         #                        for _s in mdp_obj[s]['Adj']}
@@ -336,7 +336,7 @@ def __get_cmax_reachable(V_risk, P, pi_risk, goal, A, C, lamb, k_g, W_s, succ_st
             C_max_reachable.append(
                 max([W_s[s_] - C(s, a) for a in A_])
             )
-        C_max_reachable_max = max(C_max_reachable, default=0)
+        C_max_reachable_max = max(C_max_reachable, default=float('-inf'))
 
         C_maxs_s[s] = w_s \
             if (w_s >= C_max_reachable_max) \
@@ -346,7 +346,7 @@ def __get_cmax_reachable(V_risk, P, pi_risk, goal, A, C, lamb, k_g, W_s, succ_st
 
 def get_cmax_reachable(s, V_risk, V_i, P, pi_risk, goal, A, C, lamb, k_g, succ_states, visited=None, W_s=None):
     if check_goal(utils.from_literals(s), goal):
-        return {s: 0}
+        return {s: -float('-inf')}
     W_s = W_s or {}
     i = 0
     W_s = get_w_reachable(

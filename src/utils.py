@@ -1,7 +1,8 @@
 import json
 import os
+import re
 from pddlgym.core import PDDLEnv
-from pddlgym.structs import State
+from pddlgym.structs import State, TypedEntity
 #def find_state_by_coord(x, y):
 #    return [s for s in S if get_values(s.literals, 'robot-at')[0][1].split(':')[0][1:-1] == f'{x}-{y}'][0]
 #
@@ -71,18 +72,23 @@ def create_states_from_base_literals(base_state_literals,
         for literals in state_literals
     ]
 
-
 # Text rendering
 # ===========================================================================
+
+def tireworld_get_location(obs):
+    obs = obs if type(obs) == State else from_literals(obs)
+    for lit in obs.literals:
+        if lit.predicate.name == 'vehicle-at':
+            return lit.variables[0]
+    return []
+
 def tireworld_text_render(obs):
     obs = obs if type(obs) == State else from_literals(obs)
-    vehicle_location = None
+    vehicle_location = tireworld_get_location(obs)
     flattire = True
     spare_in_locs = []
     for lit in obs.literals:
-        if lit.predicate.name == 'vehicle-at':
-            vehicle_location = lit.variables[0]
-        elif lit.predicate.name == 'not-flattire':
+        if lit.predicate.name == 'not-flattire':
             flattire = False
         elif lit.predicate.name == 'spare-in':
             spare_in_locs.append(lit.variables[0])
@@ -118,6 +124,26 @@ def river_alt_text_render(obs):
         Robot at {location}
         {f"Qualifiers: {qualifiers}" if len(qualifiers) > 0 else ""}
     """
+
+def get_location_string(loc):
+    if loc == []:
+        return "deadend"
+    elif type(loc) == TypedEntity:
+        return loc
+    elif type(loc[0]) == TypedEntity:
+        return loc[0]
+    else:
+        return loc[0][0]
+
+def parse_location_string(loc_str):
+    if res := re.search(r"\d+-\d+", loc_str):
+        return res.group()
+    return loc_str
+
+def parse_location(loc):
+    return parse_location_string(
+        get_location_string(loc)
+    )
 
 def navigation_text_render(obs):
     obs = obs if type(obs) == State else from_literals(obs)
@@ -164,7 +190,7 @@ def expblocks_text_render(obs):
     """
 
 
-navigation_is = range(1, 5)
+navigation_is = range(1, 11)
 navigation_keys = [f"PDDLEnvNavigation{i}-v0" for i in navigation_is]
 text_render_env_functions = {
     "PDDLEnvTireworld-v0": tireworld_text_render,
@@ -172,6 +198,12 @@ text_render_env_functions = {
     "PDDLEnvExplodingblocksTest-v0": expblocks_text_render,
     "PDDLEnvRiver-alt-v0": river_alt_text_render,
     **{k: navigation_text_render for k in navigation_keys}
+}
+
+get_location_functions = {
+    "PDDLEnvTireworld-v0": tireworld_get_location,
+    "PDDLEnvRiver-alt-v0": river_alt_get_location,
+    **{k: navigation_get_locations for k in navigation_keys}
 }
 
 

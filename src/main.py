@@ -3,6 +3,7 @@ import os
 import sys
 import time
 import gym
+import math
 import imageio
 import pddlgym
 import numpy as np
@@ -33,6 +34,7 @@ DEFAULT_ELIMINATE_TRAPS = False
 DEFAULT_PRINT_SIM_HISTORY = False
 DEFAULT_PLOT_STATS = False
 DEFAULT_OUTPUT_DIR = "./output"
+DEFAULT_DUMP_CMAXS = False
 
 
 def parse_args():
@@ -150,6 +152,15 @@ def parse_args():
         "Defines whether or not to run a series of episodes with both a random policy and the policy returned by the algorithm and plot stats about these runs (default: %s)"
         % DEFAULT_PLOT_STATS)
 
+    parser.add_argument(
+        '--dump_c_maxs',
+        dest='dump_c_maxs',
+        action="store_true",
+        default=DEFAULT_DUMP_CMAXS,
+        help=
+        "Defines whether or not to save cmaxs values for each state on the resulting json output file (default: %s)"
+        % DEFAULT_DUMP_CMAXS)
+
     return parser.parse_args()
 
 
@@ -189,6 +200,12 @@ def run_episode(pi,
 
 def h_1(_):
     return 1
+
+def get_c_maxs_object(env, C_maxs):
+    location_func = utils.get_location_functions[env.spec.id]
+    location_dict = {s: location_func(utils.from_literals(s)) for s in C_maxs}
+
+    return {utils.parse_location(loc): float(C_maxs[s]) if C_maxs[s] != -math.inf else "-inf" for s, loc in location_dict.items()}
 
 
 args = parse_args()
@@ -450,6 +467,7 @@ if args.render_and_save:
         len(explicit_graph_dc) if explicit_graph_dc else 0,
         'C_max':
         C_max,
+        **({'c_maxs': get_c_maxs_object(env, C_maxs)} if args.dump_c_maxs else {}),
         'value_s0_dc':
         explicit_graph_dc[obs.literals]['value']
         if explicit_graph_dc else V_dual[V_i[obs.literals]],
@@ -463,7 +481,7 @@ if args.render_and_save:
         'prob_s0_gubs':
         explicit_graph[(obs.literals,
                         0)]['prob'] if explicit_graph else P[V_i[obs.literals],
-                                                             0]
+                                                             0],
     },
                                     output_dir=output_dir)
     if output_file_path:

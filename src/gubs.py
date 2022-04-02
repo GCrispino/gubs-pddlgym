@@ -1,4 +1,5 @@
 import itertools
+import math
 from utils import get_values
 import utils
 import numpy as np
@@ -221,7 +222,7 @@ def W(s, a, V_diff, V_i, P, k_g, lamb, succ_states):
 
     W = None
     if denominator == 0:
-        W = 0
+        W = -math.inf
     else:
         W = np.nan
         try:
@@ -231,9 +232,9 @@ def W(s, a, V_diff, V_i, P, k_g, lamb, succ_states):
         except FloatingPointError:
             pass
         if not np.isnan(W):
-            W = max(0, np.ceil(W).astype(int))
+            W = max(-math.inf, np.ceil(W).astype(int))
         else:
-            W = 0
+            W = -math.inf
 
     return W
 

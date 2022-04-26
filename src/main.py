@@ -275,9 +275,11 @@ if args.algorithm_gubs == 'ao':
     #print('Size explicit graph dc:', len(explicit_graph_dc))
     print('Result for initial state dc:',
           explicit_graph_dc[obs.literals]['prob'],
+          explicit_graph_dc[obs.literals]['pi'],
           explicit_graph_dc[obs.literals]['value'])
     print(
         'Result for initial state:', explicit_graph[(obs.literals, 0)]['prob'],
+        explicit_graph[(obs.literals, 0)]['pi'],
         explicit_graph[(obs.literals, 0)]['value'],
         explicit_graph[(obs.literals, 0)]['value'] +
         args.k_g * explicit_graph[(obs.literals, 0)]['prob'])
@@ -335,8 +337,10 @@ elif args.algorithm_dc == 'vi':
         n_updates = (C_max_plus + 1) * len(S)
         keep_cost = True
         print('Result for initial state dc:', P_dual[V_i[obs.literals]],
+              pi_dual[V_i[obs.literals]],
               V_dual[V_i[obs.literals]])
         print('Result for initial state:', P[V_i[obs.literals], 0],
+              pi[V_i[obs.literals], 0],
               V[V_i[obs.literals], 0])
     else:
         pi_func = lambda s: pi_dual[V_i[s]]

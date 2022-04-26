@@ -1,3 +1,4 @@
+import math
 import os
 import unittest
 import pytest
@@ -186,7 +187,7 @@ class TestGUBS(unittest.TestCase):
             river_0_states[0]: 6, river_0_states[1]: 7, river_0_states[2]: 6, river_0_states[3]: 5,
             river_0_states[4]: 7, river_0_states[5]: 8, river_0_states[6]: 7, river_0_states[7]: 6,
             river_0_states[8]: 6, river_0_states[9]: 7, river_0_states[10]: 6, river_0_states[11]: 5,
-            river_0_states[12]: 0, river_0_states[13]: 0, river_0_states[14]: 0, river_0_states[15]: 0,
+            river_0_states[12]: -math.inf, river_0_states[13]: -math.inf, river_0_states[14]: -math.inf, river_0_states[15]: -math.inf,
         }
 
         assert len(C_maxs_s0) == len(S_river_0)
@@ -219,7 +220,7 @@ class TestGUBS(unittest.TestCase):
             river_1_states[20]: 25, river_1_states[21]: 26, river_1_states[22]: 27, river_1_states[23]: 26, river_1_states[24]: 25,
             river_1_states[25]: 24, river_1_states[26]: 25, river_1_states[27]: 26, river_1_states[28]: 25, river_1_states[29]: 24,
             river_1_states[30]: 23, river_1_states[31]: 24, river_1_states[32]: 25, river_1_states[33]: 24, river_1_states[34]: 23,
-            river_1_states[35]: 0,  river_1_states[36]: 0,  river_1_states[37]: 0,  river_1_states[38]: 0,  river_1_states[39]: 0
+            river_1_states[35]: -math.inf,  river_1_states[36]: -math.inf,  river_1_states[37]: -math.inf,  river_1_states[38]: -math.inf,  river_1_states[39]: -math.inf
         }
 
         assert len(W_s0) == 40

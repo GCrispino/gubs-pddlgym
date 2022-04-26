@@ -266,7 +266,7 @@ if args.algorithm_gubs == 'ao':
         args.algorithm_dc == 'lao_eliminate_traps',
         args.algorithm_dc == 'ilao', args.expansion_levels)
 
-    C_max = int(C_maxs[obs.literals])
+    C_max = int(C_maxs[obs.literals]) if C_maxs[obs.literals] != -math.inf else -math.inf
     print("C_max:", C_max)
     solved_states = [s for s, v in explicit_graph_dc.items() if v['solved']]
     pi_func = lambda s, C: explicit_graph[(s, C)]['pi'] if (
@@ -331,7 +331,8 @@ elif args.algorithm_dc == 'vi':
                                  args.k_g, V_i, S, goal, succ_states, A)
         pi_func = lambda s, C: pi[V_i[s], C] if C < pi.shape[1] else pi[V_i[s],
                                                                         -1]
-        n_updates = (C_max + 1) * len(S)
+        C_max_plus = max(C_max, 0)
+        n_updates = (C_max_plus + 1) * len(S)
         keep_cost = True
         print('Result for initial state dc:', P_dual[V_i[obs.literals]],
               V_dual[V_i[obs.literals]])

@@ -109,12 +109,12 @@ def get_P_diff_W(s, a, P1, P2, V_i, k_g, succ_s):
 
 def get_cmax(V, V_i, P, S, succ_states, A, lamb, k_g, c=1):
     X = get_X(V, V_i, lamb, S, succ_states, A)
-    W = np.zeros(len(X))
+    W = np.full(len(X), -math.inf)
 
     for i, ((s, a), x) in enumerate(X):
         denominator = get_P_diff_W(s, a, P, P, V_i, k_g, succ_states[s, a])
         if denominator == 0:
-            W[i] = -np.inf
+            W[i] = -math.inf
         else:
             W[i] = -(1 / lamb) * np.log(
                 x / denominator
@@ -123,11 +123,11 @@ def get_cmax(V, V_i, P, S, succ_states, A, lamb, k_g, c=1):
     try:
         C_max = np.max(W[np.invert(np.isnan(W))])
     except:
-        return 0
-    if C_max < 0 or C_max == np.inf:
-        return 0
+        return -math.inf
+    if C_max == np.inf:
+        raise Exception("this shouldn't happen")
 
-    return int(np.ceil(C_max))
+    return int(np.ceil(C_max)) if C_max != -math.inf else -math.inf
 
 def get_cmax_all(V, V_i, P, S, A, lamb, k_g, succ_states, c=1):
 
@@ -163,10 +163,12 @@ def egubs_vi(V_dual, P_dual, pi_dual, C_max, lamb, k_g, V_i, S, goal, succ_state
     n_states = len(S)
     n_actions = len(A)
 
-    V = np.zeros((n_states, C_max + 1))
-    V_dual_C = np.zeros((n_states, C_max + 2))
-    P = np.zeros((n_states, C_max + 2))
-    pi = np.full((n_states, C_max + 2), None)
+    C_max_plus = max(C_max, 0)
+
+    V = np.zeros((n_states, C_max_plus + 1))
+    V_dual_C = np.zeros((n_states, C_max_plus + 2))
+    P = np.zeros((n_states, C_max_plus + 2))
+    pi = np.full((n_states, C_max_plus + 2), None)
 
     #print(C_max, len(G_i), V_dual_C.shape)
     for i in range(V_dual_C.shape[1]):
@@ -174,12 +176,12 @@ def egubs_vi(V_dual, P_dual, pi_dual, C_max, lamb, k_g, V_i, S, goal, succ_state
 
     #V_dual_C[G_i, :] = V_dual[G_i]
     P[G_i, :] = 1
-    V_dual_C[:, C_max + 1] = V_dual.T
-    P[:, C_max + 1] = P_dual.T
-    pi[:, C_max + 1] = pi_dual.T
+    V_dual_C[:, C_max_plus + 1] = V_dual.T
+    P[:, C_max_plus + 1] = P_dual.T
+    pi[:, C_max_plus + 1] = pi_dual.T
 
     n_updates = 0
-    for C in reversed(range(C_max + 1)):
+    for C in reversed(range(C_max_plus + 1)):
         Q = np.zeros(n_actions)
         P_a = np.zeros(n_actions)
         for s in S:

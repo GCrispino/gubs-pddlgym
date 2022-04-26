@@ -430,7 +430,7 @@ if args.render_and_save:
     output_outdir = args.output_dir
     domain_name = env.domain.domain_name
     problem_name = domain_name + str(
-        env._problem_idx) if env._problem_index_fixed else None
+        env.env._problem_idx) if env.env._problem_index_fixed else None
     output_dir = os.path.join(output_outdir, domain_name, problem_name,
                               f"{str(datetime.now().timestamp())}")
     if not os.path.isdir(output_dir):

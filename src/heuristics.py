@@ -25,7 +25,7 @@ def shortest_path_from_goal(graph, V_i, s0):
 
 
 def tireworld_shortest_path(env):
-    problem = env.problems[env._problem_idx]
+    problem = env.problems[env.env._problem_idx]
     road_predicates = utils.get_literals_that_start_with(
         problem.initial_state, 'road')
 
@@ -54,7 +54,7 @@ def tireworld_shortest_path(env):
 
 
 def river_shortest_path(env):
-    problem = env.problems[env._problem_idx]
+    problem = env.problems[env.env._problem_idx]
     conn_predicates = utils.get_literals_that_start_with(
         problem.initial_state, 'conn')
 
@@ -99,7 +99,7 @@ def river_data(env):
 
 
 def tireworld_h_p_data(env):
-    problem = env.problems[env._problem_idx]
+    problem = env.problems[env.env._problem_idx]
     road_predicates = utils.get_literals_that_start_with(
         problem.initial_state, 'road')
 
@@ -169,7 +169,7 @@ def river_h_v(env, obs, lamb, data):
 
 
 def river_get_ny(env):
-    problem = env.problems[env._problem_idx]
+    problem = env.problems[env.env._problem_idx]
     loc_objs = utils.get_objects_by_name(problem.objects, 'location')
     ny = max(map(lambda x: int(x[1:-1].split('-')[1]), loc_objs)) + 1
     return ny

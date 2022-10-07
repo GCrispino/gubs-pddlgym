@@ -213,8 +213,10 @@ def egubs_vi(V_dual, P_dual, pi_dual, C_max, lamb, k_g, V_i, S, goal, succ_state
             P[i_s, C] = P_a[i_a_opt]
             V_dual_C[i_s, C] = Q[i_a_opt]
             V[i_s, C] = V_dual_C[i_s, C] + k_g * P[i_s, C]
+            #print("(i_s, C):", i_s, C)
+            #print(V_dual_C[i_s, C], k_g, P[i_s, C], V[i_s, C])
 
-    return V, P, pi
+    return V, V_dual_C, P, pi
 
 def W(s, a, V_diff, V_i, P, k_g, lamb, succ_states):
     #denominator = k_g * (np.sum(np.fromiter((s_['A'][a] * P[V_i[s_['name']]]

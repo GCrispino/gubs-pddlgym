@@ -329,7 +329,7 @@ elif args.algorithm_dc == 'vi':
         C_max = gubs.get_cmax(V_dual, V_i, P_dual, S, succ_states, A,
                               args.lamb, args.k_g)
         print("C_max:", C_max)
-        V, P, pi = gubs.egubs_vi(V_dual, P_dual, pi_dual, C_max, args.lamb,
+        V, V_dual_C, P, pi = gubs.egubs_vi(V_dual, P_dual, pi_dual, C_max, args.lamb,
                                  args.k_g, V_i, S, goal, succ_states, A)
         pi_func = lambda s, C: pi[V_i[s], C] if C < pi.shape[1] else pi[V_i[s],
                                                                         -1]
@@ -339,9 +339,25 @@ elif args.algorithm_dc == 'vi':
         print('Result for initial state dc:', P_dual[V_i[obs.literals]],
               pi_dual[V_i[obs.literals]],
               V_dual[V_i[obs.literals]])
+
         print('Result for initial state:', P[V_i[obs.literals], 0],
               pi[V_i[obs.literals], 0],
               V[V_i[obs.literals], 0])
+        #print("V_i:", V_i[obs.literals])
+        # print('  Q:')
+        # for i_a, a in enumerate(A):
+        #     successors = succ_states[obs.literals, a]
+        #     gen_q = [p * V_dual_C[V_i[s_], 1]
+        #              for s_, p in successors.items()]
+        #     gen_p = [p * P[V_i[s_], 1]
+        #              for s_, p in successors.items()]
+        #     q_ = gubs.u(args.lamb, 1) * \
+        #         np.sum(np.fromiter(gen_q, dtype=np.float))
+        #     p = np.sum(np.fromiter(gen_p, dtype=np.float))
+        #     q = gubs.u(args.lamb, 0) * q_ + args.k_g * p
+        #     print(f'     {a}: {q}, {p}')
+        #     # print('  q_s:', gen_q)
+        #     # print('  p_s:', gen_p)
     else:
         pi_func = lambda s: pi_dual[V_i[s]]
         n_updates = n_updates_dc

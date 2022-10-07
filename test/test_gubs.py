@@ -179,7 +179,7 @@ class TestGUBS(unittest.TestCase):
         C = C_factory(goal_river_0)
         C_maxs_s0, _ = gubs.get_cmax_reachable(
             s0, V_risk_river_4x4, V_i_river_0,
-            P_river_4x4, pi_risk_river_4x4, goal_river_0,
+            P_river_4x4, goal_river_0,
             A_river_0, C, lamb, k_g, succ_states_river_0
         )
 
@@ -208,7 +208,7 @@ class TestGUBS(unittest.TestCase):
         C = C_factory(goal_river_1)
         W_s0, _ = gubs.get_cmax_reachable(
             s0, V_risk_river_5x8, V_i_river_1,
-            P_river_5x8, pi_risk_river_5x8, goal_river_1,
+            P_river_5x8, goal_river_1,
             A_river_1, C, lamb, k_g, succ_states_river_1
         )
 

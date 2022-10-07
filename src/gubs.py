@@ -254,7 +254,7 @@ def can_improve(V, V_i, s, a, C, lamb, succ_states):
 
     return V_diff < 0, V_diff
 
-def get_w_reachable(s, V_risk, V_i, P, pi_risk, goal, A, C, lamb, k_g, succ_states, visited=None, W_s=None):
+def get_w_reachable(s, V_risk, V_i, P, goal, A, C, lamb, k_g, succ_states, visited=None, W_s=None):
     if check_goal(utils.from_literals(s), goal):
         return {s: float('-inf')}
 
@@ -299,7 +299,7 @@ def get_w_reachable(s, V_risk, V_i, P, pi_risk, goal, A, C, lamb, k_g, succ_stat
             W_s = {
                 **W_s,
                 **get_w_reachable(
-                    s_, V_risk, V_i, P, pi_risk, goal, A, C, lamb, k_g, succ_states, visited, W_s)
+                    s_, V_risk, V_i, P, goal, A, C, lamb, k_g, succ_states, visited, W_s)
             }
             # Go through each action a that can lead to s_
             #   and get maximum difference between W_s[s_] and C(s, a)
@@ -316,7 +316,7 @@ def get_w_reachable(s, V_risk, V_i, P, pi_risk, goal, A, C, lamb, k_g, succ_stat
     return W_s
 
 
-def __get_cmax_reachable(V_risk, P, pi_risk, goal, A, C, lamb, k_g, W_s, succ_states):
+def __get_cmax_reachable(V_risk, P, goal, A, C, lamb, k_g, W_s, succ_states):
     C_maxs_s = {}
 
     for s in W_s:
@@ -349,19 +349,19 @@ def __get_cmax_reachable(V_risk, P, pi_risk, goal, A, C, lamb, k_g, W_s, succ_st
 
     return C_maxs_s
 
-def get_cmax_reachable(s, V_risk, V_i, P, pi_risk, goal, A, C, lamb, k_g, succ_states, visited=None, W_s=None):
+def get_cmax_reachable(s, V_risk, V_i, P, goal, A, C, lamb, k_g, succ_states, visited=None, W_s=None):
     if check_goal(utils.from_literals(s), goal):
         return {s: -float('-inf')}
     W_s = W_s or {}
     i = 0
     W_s = get_w_reachable(
-        s, V_risk, V_i, P, pi_risk, goal, A, C, lamb, k_g, succ_states, W_s=W_s)
+        s, V_risk, V_i, P, goal, A, C, lamb, k_g, succ_states, W_s=W_s)
     old_C_maxs_s = {}
     C_maxs_s = W_s
     while old_C_maxs_s != C_maxs_s:
         old_C_maxs_s = C_maxs_s
         C_maxs_s = __get_cmax_reachable(
-            V_risk, P, pi_risk, goal, A, C, lamb, k_g, C_maxs_s, succ_states)
+            V_risk, P, goal, A, C, lamb, k_g, C_maxs_s, succ_states)
         i += 1
     return C_maxs_s, W_s
 

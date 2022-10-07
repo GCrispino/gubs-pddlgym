@@ -316,7 +316,7 @@ def get_w_reachable(s, V_risk, V_i, P, goal, A, C, lamb, k_g, succ_states, visit
     return W_s
 
 
-def __get_cmax_reachable(V_risk, P, goal, A, C, lamb, k_g, W_s, succ_states):
+def __get_cmax_reachable(goal, A, C, W_s, succ_states):
     C_maxs_s = {}
 
     for s in W_s:
@@ -361,7 +361,7 @@ def get_cmax_reachable(s, V_risk, V_i, P, goal, A, C, lamb, k_g, succ_states, vi
     while old_C_maxs_s != C_maxs_s:
         old_C_maxs_s = C_maxs_s
         C_maxs_s = __get_cmax_reachable(
-            V_risk, P, goal, A, C, lamb, k_g, C_maxs_s, succ_states)
+            goal, A, C, C_maxs_s, succ_states)
         i += 1
     return C_maxs_s, W_s
 

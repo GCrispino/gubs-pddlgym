@@ -16,8 +16,6 @@ import gubs
 import heuristics
 import utils
 
-matplotlib.use('TkAgg')
-
 sys.setrecursionlimit(5000)
 
 DEFAULT_PROB_INDEX = 0
@@ -465,13 +463,14 @@ if args.simulate:
                           print_history=args.print_sim_history,
                           keep_cost=keep_cost)
 explicit_graph_new_keys = None
-if explicit_graph:
-    for k, v in explicit_graph.items():
-        if 'parents' in v:
-            explicit_graph[k]['parents'] = list(explicit_graph[k]['parents'])
-    explicit_graph_new_keys = {(str(
-        (k[0], k[1])) if type(k) == tuple else str(k)): v
-                               for k, v in explicit_graph.items()}
+# COMMENTED OUT DUE TO MEMORY ISSUES
+# if explicit_graph:
+#     for k, v in explicit_graph.items():
+#         if 'parents' in v:
+#             explicit_graph[k]['parents'] = list(explicit_graph[k]['parents'])
+#     explicit_graph_new_keys = {(str(
+#         (k[0], k[1])) if type(k) == tuple else str(k)): v
+#                                for k, v in explicit_graph.items()}
 
 if args.render_and_save:
     output_filename = str(datetime.time(datetime.now())) + '.json'

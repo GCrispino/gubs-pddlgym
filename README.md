@@ -4,6 +4,8 @@ Implementation of algorithms eGUBS-VI and eGUBS-AO* for solving the GUBS criteri
 
 This is the code used for the first set of experiments of the paper "GUBS criterion: arbitrary trade-offs between cost and probability-to-goal in stochastic planning based on Expected Utility Theory" ([link](https://www.sciencedirect.com/science/article/pii/S0004370222001886)), that compares the performance of algorithms eGUBS-VI and eGUBS-AO*.
 
+Note: for the code used in the second set of experiments outlined in the paper, please see this other repository: https://github.com/GCrispino/ssp-deadends.
+
 ## Installing
 
 1. Create and activate virtual environment:
